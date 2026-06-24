@@ -597,7 +597,6 @@ async def main():
                 await run_test(session, "J4 update_shopping_item", "update_shopping_item", {"id": item_id, "checked": True})
                 await run_test(session, "J5 delete_shopping_item_by_id", "delete_shopping_item_by_id", {"id": item_id})
                 await run_verify_delete(session, "J6 verify_delete_shopping_item", "get_shopping_item_by_id", {"id": item_id})
-
         # =========================================================================
         # Phase 6f: Timeline Event CRUD
         # =========================================================================
@@ -614,6 +613,8 @@ async def main():
                 await run_test(session, "K3 update_timeline_event", "update_timeline_event", {"id": te_id, "message": "Updated event"})
                 await run_test(session, "K4 delete_timeline_event_by_id", "delete_timeline_event_by_id", {"id": te_id})
                 await run_verify_delete(session, "K5 verify_delete_timeline_event", "get_timeline_event_by_id", {"id": te_id})
+        if comment_recipe_slug:
+            await run_test(session, "I7 cleanup_comment_recipe", "delete_recipe_by_slug", {"slug": comment_recipe_slug})
 
         # =========================================================================
         # Phase 6g: Recipe Action CRUD
@@ -775,6 +776,10 @@ async def main():
             await run_test(session, "P3 bulk_update_recipe_settings", "bulk_update_recipe_settings",
                 {"recipes": [main_slug], "settings": {"public": False}})
             await run_test(session, "P4 bulk_export_recipes", "bulk_export_recipes", {"recipes": [main_slug]})
+        if tag_id:
+            await run_test(session, "P5 cleanup_bulk_tag", "delete_tag_by_id", {"id": tag_id})
+        if cat_id:
+            await run_test(session, "P6 cleanup_bulk_cat", "delete_category_by_id", {"id": cat_id})
 
         # =========================================================================
         # Phase 9: Shopping List Label Settings & Bulk Items
@@ -788,6 +793,8 @@ async def main():
         if slist_id:
             await run_test(session, "Q2 bulk_create_shopping_items", "bulk_create_shopping_items",
                 {"items": [{"shoppingListId": slist_id, "quantity": 1, "note": "Bulk item", "display": "1 Bulk"}]})
+        if item_list_id:
+            await run_test(session, "Q3 cleanup_item_list", "delete_shopping_list_by_id", {"id": item_list_id})
 
         # =========================================================================
         # Phase 10: Cookbook Operations (create fresh cookbook for this test)
@@ -800,6 +807,7 @@ async def main():
         cookbook_id = pick_id("bulk_cb")
         if cookbook_id:
             await run_test(session, "R2 update_cookbooks", "update_cookbooks", {"cookbooks": [{"id": cookbook_id, "position": 2}]})
+            await run_test(session, "R3 cleanup_bulk_cookbook", "delete_cookbook_by_id", {"id": cookbook_id})
 
         # =========================================================================
         # Phase 11: Slug-based Lookups (create fresh items first)
@@ -816,6 +824,15 @@ async def main():
         await run_test(session, "S4 get_category_by_slug", "get_category_by_slug", {"slug": cat_slug})
         await run_test(session, "S5 get_tag_by_slug", "get_tag_by_slug", {"slug": tag_slug})
         await run_test(session, "S6 get_tool_by_slug", "get_tool_by_slug", {"slug": tool_slug})
+        _slug_cat_id = pick_id("slug_cat")
+        _slug_tag_id = pick_id("slug_tag")
+        _slug_tool_id = pick_id("slug_tool")
+        if _slug_cat_id:
+            await run_test(session, "S7 cleanup_slug_cat", "delete_category_by_id", {"id": _slug_cat_id})
+        if _slug_tag_id:
+            await run_test(session, "S8 cleanup_slug_tag", "delete_tag_by_id", {"id": _slug_tag_id})
+        if _slug_tool_id:
+            await run_test(session, "S9 cleanup_slug_tool", "delete_tool_by_id", {"id": _slug_tool_id})
 
         # =========================================================================
         # Phase 12: Merge Tools (create temp items to merge)
@@ -849,6 +866,10 @@ async def main():
         unit_merge_id = pick_id("unit_merge")
         if unit_keep_id and unit_merge_id:
             await run_test(session, "T6 merge_units", "merge_units", {"unit_to_keep": unit_keep_id, "unit_to_merge": unit_merge_id})
+        if food_merge_id:
+            await run_test(session, "T7 cleanup_food_merge", "delete_food_by_id", {"id": food_merge_id})
+        if unit_merge_id:
+            await run_test(session, "T8 cleanup_unit_merge", "delete_unit_by_id", {"id": unit_merge_id})
 
         # =========================================================================
         # Phase 13: Invitations
@@ -971,7 +992,19 @@ async def main():
             _entry = _delete_tool_map.get(_artifact["type"])
             if _entry:
                 _tool_name, _param_key = _entry
-                await run_test(session, f"Za_{_artifact['type']}_{_artifact['id'][:8]}", _tool_name, {_param_key: _artifact["id"]})
+                _label = f"Za_{_artifact['type']}_{_artifact['id'][:8]}"
+                try:
+                    _resp = await session.call_tool(_tool_name, {_param_key: _artifact["id"]})
+                    _err = is_error(_resp)
+                    if _err:
+                        results.append({"label": _label, "tool": _tool_name, "status": "FAILED", "reason": _err})
+                        log(f"  FAIL {_label}: {_err}")
+                    else:
+                        results.append({"label": _label, "tool": _tool_name, "status": "FAILED", "reason": f"Leaked artifact: {_artifact['type']} '{_artifact['name']}' ({_artifact['id']})"})
+                        log(f"  FAIL {_label}: leaked artifact {_artifact['type']} '{_artifact['name']}'")
+                except Exception as e:
+                    results.append({"label": _label, "tool": _tool_name, "status": "FAILED", "reason": str(e)})
+                    log(f"  FAIL {_label}: {e}")
             else:
                 log(f"  WARNING: No delete tool for {_artifact['type']}: {_artifact['name']} ({_artifact['id']})")
 

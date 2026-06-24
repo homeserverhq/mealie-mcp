@@ -20,7 +20,7 @@ with full CRUD, meal planning, recipe scraping, and bulk operations.
   and maximize context window efficiency.
 - **🚀 Efficient Gets** — GET responses return only commonly used fields by
   default. Full objects are available via an `include_all_fields` flag.
-- **🧪 Comprehensive Testing** — 186 automated tests covering all tool
+- **🧪 Comprehensive Testing** — 201 automated tests covering all tool
   domains, run via the test runner pipeline.
 
 ## 🔧 Environment Variables
@@ -41,7 +41,7 @@ with full CRUD, meal planning, recipe scraping, and bulk operations.
 3. Run the server:
     ```bash
     export MEALIE_BASE_URL=http://localhost:8053
-    export MCP_SERVER_PORT=6059
+    export MCP_SERVER_PORT=80
     python -m src.main
     ```
 
@@ -53,10 +53,10 @@ Build and run the server using Docker:
 docker build -t mealie-mcp:latest .
 docker run -d --name mealie-mcp \
     -e MEALIE_BASE_URL="http://mealie-app:9000" \
-    -e MCP_SERVER_PORT=6059 \
+    -e MCP_SERVER_PORT=80 \
     mealie-mcp:latest
 
-The MCP server serves at `http://mealie-mcp:6059/mcp` (Streamable HTTP).
+The MCP server serves at `http://mealie-mcp:80/mcp` (Streamable HTTP).
 ```
 
 ## ⚠️ Important Notes
