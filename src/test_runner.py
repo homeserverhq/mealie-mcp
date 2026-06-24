@@ -224,7 +224,7 @@ def get_list_items(data: Any) -> list[dict[str, Any]]:
                         if isinstance(parsed, list):
                             return parsed
                         if isinstance(parsed, dict):
-                            for inner in ("collectives", "pages", "tags", "data"):
+                            for inner in ("items", "collectives", "pages", "tags", "data", "results", "rows"):
                                 if inner in parsed and isinstance(parsed[inner], list):
                                     return parsed[inner]
                     except Exception:
@@ -233,6 +233,62 @@ def get_list_items(data: Any) -> list[dict[str, Any]]:
     elif isinstance(data, list):
         return data
     return []
+
+
+def _is_test_artifact(name: str, match_prefix: str | None = None) -> bool:
+    if not name or not isinstance(name, str):
+        return False
+    name = name.strip()
+    if not name.startswith("t"):
+        return False
+    dash_pos = name.find("-", 1)
+    if dash_pos < 2 or dash_pos > 9:
+        return False
+    prefix = name[1:dash_pos]
+    if not prefix or not all(c in "0123456789abcdef" for c in prefix):
+        return False
+    if match_prefix is not None:
+        return prefix == match_prefix
+    return True
+
+
+async def scan_for_artifacts(session: MCPSession, match_prefix: str | None = None) -> list[dict]:
+    artifacts: list[dict] = []
+    scans = [
+        ("recipe", "get_all_recipes", {"page": 1, "perPage": 200}, "slug", "name"),
+        ("tag", "get_all_tags", {"page": 1, "perPage": 200}, "id", "name"),
+        ("category", "get_all_categories", {"page": 1, "perPage": 200}, "id", "name"),
+        ("tool", "get_all_tools", {"page": 1, "perPage": 200}, "id", "name"),
+        ("food", "get_all_foods", {"page": 1, "perPage": 200}, "id", "name"),
+        ("unit", "get_all_units", {"page": 1, "perPage": 200}, "id", "name"),
+        ("cookbook", "get_all_cookbooks", {"page": 1, "perPage": 200}, "id", "name"),
+        ("label", "get_all_labels", {"page": 1, "perPage": 200}, "id", "name"),
+        ("shopping_list", "get_all_shopping_lists", {"page": 1, "perPage": 200}, "id", "name"),
+        ("shopping_item", "get_all_shopping_items", {"page": 1, "perPage": 200}, "id", "note"),
+        ("mealplan", "get_all_mealplans", {"page": 1, "perPage": 200}, "id", "title"),
+        ("mealplan_rule", "get_all_mealplan_rules", {"page": 1, "perPage": 200}, "id", "day"),
+        ("comment", "get_all_comments", {"page": 1, "perPage": 200}, "id", "text"),
+        ("recipe_action", "get_all_recipe_actions", {"page": 1, "perPage": 200}, "id", "name"),
+        ("event_notification", "get_all_event_notifications", {"page": 1, "perPage": 200}, "id", "name"),
+        ("webhook", "get_all_webhooks", {"page": 1, "perPage": 200}, "id", "name"),
+        ("timeline_event", "get_all_timeline_events", {"page": 1, "perPage": 200}, "id", "id"),
+    ]
+    for entity_type, tool_name, params, id_key, name_key in scans:
+        try:
+            result = await session.call_tool(tool_name, params)
+            data = extract_content(result)
+            items = get_list_items(data)
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                name_val = str(item.get(name_key, "") or "")
+                if not _is_test_artifact(name_val, match_prefix):
+                    continue
+                id_val = str(item.get(id_key, "") or "")
+                artifacts.append({"type": entity_type, "name": name_val, "id": id_val})
+        except Exception:
+            pass
+    return artifacts
 
 
 async def run_verify_delete(session: MCPSession, label: str, get_tool: str, params: dict[str, Any] = None) -> bool:
@@ -325,6 +381,19 @@ async def main():
         tool_names = [t["name"] for t in tools_list]
         print(f"**Discovered**: {len(tool_names)} tools")
         log(f"Tools: {', '.join(sorted(tool_names))}")
+
+        # Pre-flight check: Fail if test artifacts from previous runs exist
+        log("\n--- Pre-flight artifact scan ---")
+        prev_artifacts = await scan_for_artifacts(session, match_prefix=None)
+        if prev_artifacts:
+            for a in prev_artifacts:
+                log(f"  DIRTY: {a['type']}: name=\"{a['name']}\" id={a['id']}")
+                results.append({"label": f"PRE_FLIGHT_{a['type']}", "tool": "scan_for_artifacts",
+                                "status": "FAILED", "reason": f"Pre-existing artifact: {a['type']} name=\"{a['name']}\" id={a['id']}"})
+            print(f"\n**PRE-FLIGHT CHECK FAILED**: {len(prev_artifacts)} test artifact(s) from previous runs found.")
+            print(f"Clean them up and re-run.")
+        else:
+            log("  System is clean (no pre-existing test artifacts)")
 
         # =========================================================================
         # Phase 1: Status / Health / App Info
@@ -459,7 +528,11 @@ async def main():
             await run_test(session, "G3 update_mealplan", "update_mealplan", {"id": mp_id, "title": "Updated Christmas Dinner"})
             await run_test(session, "G4 delete_mealplan_by_id", "delete_mealplan_by_id", {"id": mp_id})
             await run_verify_delete(session, "G5 verify_delete_mealplan", "get_mealplan_by_id", {"id": mp_id})
-        await run_test(session, "G6 create_random_mealplan", "create_random_mealplan")
+        await run_test_with_store(session, "G6 create_random_mealplan", "create_random_mealplan", store_key="random_mealplan")
+        rmp_id = pick_id("random_mealplan")
+        if rmp_id:
+            await run_test(session, "G7 cleanup_random_mealplan", "delete_mealplan_by_id", {"id": rmp_id})
+            await run_verify_delete(session, "G8 verify_delete_random_mealplan", "get_mealplan_by_id", {"id": rmp_id})
 
         # =========================================================================
         # Phase 6c: Mealplan Rule CRUD
@@ -648,25 +721,17 @@ async def main():
 
             # Scrape tools (uses real recipe URL provided by user)
             recipe_url = "https://www.budgetbytes.com/creamy-garlic-chicken/"
-            # Clean up legacy recipes from previous runs that share the same URL
-            try:
-                _search = await session.call_tool("get_all_recipes", {"search": "Creamy Garlic", "perPage": 100})
-                _data = extract_content(_search)
-                if isinstance(_data, dict):
-                    _items_text = _data.get("items", "")
-                    if isinstance(_items_text, str):
-                        _parsed = toon_to_json(_items_text)
-                        _items_list = _parsed if isinstance(_parsed, list) else _parsed.get("items", [])
-                        for _item in _items_list:
-                            _slug = _item.get("slug", "") if isinstance(_item, dict) else ""
-                            if _slug.startswith("creamy-garlic-chicken-recipe"):
-                                await session.call_tool("delete_recipe_by_slug", {"slug": _slug})
-            except Exception:
-                pass
             await run_test(session, "O17 test_scrape_url", "test_scrape_url", {"url": recipe_url})
             await run_test_with_store(session, "O18 create_recipe_from_url", "create_recipe_from_url",
-                {"url": recipe_url, "includeTags": True, "includeNutrition": False}, store_key="scraped_recipe")
-            await run_test(session, "O19 create_recipe_from_url_bulk", "create_recipe_from_url_bulk", {"urls": [recipe_url, recipe_url]})
+                {"url": recipe_url, "includeTags": False, "includeNutrition": False}, store_key="scraped_recipe")
+            await run_test_with_store(session, "O19 create_recipe_from_url_bulk", "create_recipe_from_url_bulk", {"urls": [recipe_url, recipe_url]}, store_key="o19_result")
+            _o19_data = store.get("o19_result", [])
+            _o19_slugs = []
+            if isinstance(_o19_data, list):
+                for _item in _o19_data:
+                    if isinstance(_item, dict) and _item.get("slug"):
+                        _o19_slugs.append(_item["slug"])
+            store["o19_slugs"] = _o19_slugs
             # O20 uses HTML scraped from the same recipe page
             import httpx as _httpx
             try:
@@ -674,7 +739,10 @@ async def main():
                 _html_data = _resp.text
             except Exception:
                 _html_data = "<html><body>test</body></html>"
-            await run_test(session, "O20 create_recipe_from_html_or_json", "create_recipe_from_html_or_json", {"data": _html_data})
+            await run_test_with_store(session, "O20 create_recipe_from_html_or_json", "create_recipe_from_html_or_json", {"data": _html_data}, store_key="o20_result")
+            _o20_data = store.get("o20_result", {})
+            _o20_slug = _o20_data.get("slug") if isinstance(_o20_data, dict) else None
+            store["o20_slug"] = _o20_slug
 
             # Shopping list recipe operations
             if item_list_id:
@@ -837,19 +905,87 @@ async def main():
         # =========================================================================
         # Phase 18: Shopping items bulk delete
         log("\n=== Phase 18: Shopping Bulk Delete ===")
-        await run_test(session, "Z1 bulk_delete_shopping_items", "bulk_delete_shopping_items", {"ids": [str(uuid.uuid4())]})
+        _z1_ids: list[str] = [str(uuid.uuid4())]  # fallback
+        if item_list_id:
+            _z1_items = []
+            try:
+                for _i in range(2):
+                    _resp = await session.call_tool("create_shopping_item", {"shoppingListId": item_list_id, "quantity": _i + 1, "note": f"Z1 bulk {_i}"})
+                    _data = extract_content(_resp)
+                    if isinstance(_data, dict) and _data.get("id"):
+                        _z1_items.append(_data["id"])
+                if _z1_items:
+                    _z1_ids = _z1_items
+            except Exception:
+                pass
+        await run_test(session, "Z1 bulk_delete_shopping_items", "bulk_delete_shopping_items", {"ids": _z1_ids})
 
         # =========================================================================
-        # Phase 19: Cleanup - remove test recipe and related
+        # Phase 19: Cleanup - remove all test artifacts
         # =========================================================================
         log("\n=== Phase 19: Cleanup ===")
+
+        # 1. Delete known recipes by slug
+        scraped_slug = pick_slug("scraped_recipe")
         if dup_slug and dup_slug != main_slug:
             await run_test(session, "Z2 cleanup_dup_recipe", "delete_recipe_by_slug", {"slug": dup_slug})
-        scraped_slug = pick_slug("scraped_recipe")
         if scraped_slug and scraped_slug != main_slug:
             await run_test(session, "Z4 cleanup_scraped_recipe", "delete_recipe_by_slug", {"slug": scraped_slug})
         if main_slug:
             await run_test(session, "Z3 cleanup_main_recipe", "delete_recipe_by_slug", {"slug": main_slug})
+
+        # 2. Delete O19/O20 creamy-garlic-chicken recipes (not tXXXX- pattern)
+        try:
+            _search = await session.call_tool("get_all_recipes", {"search": "creamy garlic", "perPage": 100})
+            _cgc_data = extract_content(_search)
+            _cgc_items = get_list_items(_cgc_data)
+            for _item in _cgc_items:
+                _slug = _item.get("slug", "")
+                if _slug.startswith("creamy-garlic-chicken-recipe") and _slug not in (main_slug, dup_slug, scraped_slug):
+                    await run_test(session, f"Z5 cleanup_cgc_{_slug[-8:]}", "delete_recipe_by_slug", {"slug": _slug})
+        except Exception:
+            pass
+
+        # 3. Delete all remaining t{rid}- test artifacts via catch-all scan
+        _remaining = await scan_for_artifacts(session, match_prefix=rid)
+        _delete_tool_map = {
+            "recipe": ("delete_recipe_by_slug", "slug"),
+            "category": ("delete_category_by_id", "id"),
+            "tag": ("delete_tag_by_id", "id"),
+            "tool": ("delete_tool_by_id", "id"),
+            "food": ("delete_food_by_id", "id"),
+            "unit": ("delete_unit_by_id", "id"),
+            "cookbook": ("delete_cookbook_by_id", "id"),
+            "shopping_list": ("delete_shopping_list_by_id", "id"),
+            "shopping_item": ("delete_shopping_item_by_id", "id"),
+            "mealplan": ("delete_mealplan_by_id", "id"),
+            "mealplan_rule": ("delete_mealplan_rule_by_id", "id"),
+            "comment": ("delete_comment_by_id", "id"),
+            "recipe_action": ("delete_recipe_action_by_id", "id"),
+            "event_notification": ("delete_event_notification_by_id", "id"),
+            "webhook": ("delete_webhook_by_id", "id"),
+            "timeline_event": ("delete_timeline_event_by_id", "id"),
+            "label": ("delete_label_by_id", "id"),
+        }
+        for _artifact in _remaining:
+            _entry = _delete_tool_map.get(_artifact["type"])
+            if _entry:
+                _tool_name, _param_key = _entry
+                await run_test(session, f"Za_{_artifact['type']}_{_artifact['id'][:8]}", _tool_name, {_param_key: _artifact["id"]})
+            else:
+                log(f"  WARNING: No delete tool for {_artifact['type']}: {_artifact['name']} ({_artifact['id']})")
+
+        # 4. Post-flight integrity check: scan for any leftover artifacts
+        log("\n--- Post-flight artifact scan ---")
+        _post = await scan_for_artifacts(session, match_prefix=rid)
+        if _post:
+            for _a in _post:
+                log(f"  LEFTOVER: {_a['type']}: name=\"{_a['name']}\" id={_a['id']}")
+                results.append({"label": f"POST_FLIGHT_{_a['type']}_{_a['id'][:8]}", "tool": "post_flight_scan",
+                                "status": "FAILED", "reason": f"Leftover {_a['type']}: name=\"{_a['name']}\" id={_a['id']}"})
+            print(f"\n**POST-FLIGHT CHECK FAILED**: {len(_post)} test artifact(s) remain after cleanup.")
+        else:
+            log("  Post-flight check: all clean")
 
         # =========================================================================
         # Report Summary
