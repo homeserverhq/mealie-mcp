@@ -432,7 +432,8 @@ async def update_recipe(
         extras=extras, image=image,
     )
     return await get_client().patch_recipe(
-        slug, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        slug, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -455,7 +456,7 @@ async def duplicate_recipe(
     Args:
         slug: The slug of the recipe to duplicate (required).
     """
-    return await get_client().duplicate_recipe(slug, get_user_token())
+    return await get_client().duplicate_recipe(slug, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 @mcp.tool()
 async def update_recipe_last_made(
@@ -723,7 +724,8 @@ async def create_category(
     """
     params = CreateCategoryParam(name=name)
     return await get_client().create_category(
-        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -739,7 +741,8 @@ async def update_category(
     """
     params = UpdateCategoryParam(name=name)
     return await get_client().update_category(
-        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -822,7 +825,8 @@ async def create_tag(
     """
     params = CreateTagParam(name=name)
     return await get_client().create_tag(
-        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -838,7 +842,8 @@ async def update_tag(
     """
     params = UpdateTagParam(name=name)
     return await get_client().update_tag(
-        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -912,7 +917,8 @@ async def create_tool(
     """
     params = CreateToolParam(name=name)
     return await get_client().create_tool(
-        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -928,7 +934,8 @@ async def update_tool(
     """
     params = UpdateToolParam(name=name)
     return await get_client().update_tool(
-        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -997,7 +1004,8 @@ async def create_food(
         name=name, description=description, pluralName=pluralName, aliases=aliases
     )
     return await get_client().create_food(
-        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -1021,7 +1029,8 @@ async def update_food(
         name=name, description=description, pluralName=pluralName, aliases=aliases
     )
     return await get_client().update_food(
-        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -1046,7 +1055,7 @@ async def merge_foods(
         food_to_keep: ID of the food to keep (required).
         food_to_merge: ID of the food to merge into the kept food (required).
     """
-    return await get_client().merge_foods(food_to_keep, food_to_merge, get_user_token())
+    return await get_client().merge_foods(food_to_keep, food_to_merge, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 # =============================================================================
 # Units
@@ -1113,7 +1122,8 @@ async def create_unit(
         fraction=fraction, useAbbreviation=useAbbreviation, aliases=aliases
     )
     return await get_client().create_unit(
-        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -1147,7 +1157,8 @@ async def update_unit(
         fraction=fraction, useAbbreviation=useAbbreviation, aliases=aliases
     )
     return await get_client().update_unit(
-        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -1172,7 +1183,7 @@ async def merge_units(
         unit_to_keep: ID of the unit to keep (required).
         unit_to_merge: ID of the unit to merge into the kept unit (required).
     """
-    return await get_client().merge_units(unit_to_keep, unit_to_merge, get_user_token())
+    return await get_client().merge_units(unit_to_keep, unit_to_merge, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 # =============================================================================
 # Comments
@@ -1223,7 +1234,8 @@ async def create_comment(
     """
     params = CreateCommentParam(recipeId=recipeId, text=text)
     return await get_client().create_comment(
-        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -1239,7 +1251,8 @@ async def update_comment(
     """
     params = UpdateCommentParam(text=text)
     return await get_client().update_comment(
-        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -1311,7 +1324,8 @@ async def create_cookbook(
         public=public, queryFilterString=queryFilterString
     )
     return await get_client().create_cookbook(
-        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -1338,7 +1352,8 @@ async def update_cookbook(
         public=public, queryFilterString=queryFilterString
     )
     return await get_client().update_cookbook(
-        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -1361,7 +1376,7 @@ async def update_cookbooks(
     Args:
         cookbooks: List of cookbook objects with id, position, etc. (required).
     """
-    return await get_client().update_cookbooks(cookbooks, get_user_token())
+    return await get_client().update_cookbooks(cookbooks, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 # =============================================================================
 # Mealplans
@@ -1436,7 +1451,8 @@ async def create_mealplan(
     if text:
         data["text"] = text
     return await get_client().create_mealplan(
-        data, get_user_token()
+        data, get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -1450,7 +1466,7 @@ async def create_random_mealplan(
     """
     if not date:
         date = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d")
-    return await get_client().create_random_mealplan({"date": date}, get_user_token())
+    return await get_client().create_random_mealplan({"date": date}, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 @mcp.tool()
 async def update_mealplan(
@@ -1476,7 +1492,8 @@ async def update_mealplan(
         recipeId=recipeId, text=text
     )
     return await get_client().update_mealplan(
-        str(id), params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        str(id), params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -1541,7 +1558,8 @@ async def create_mealplan_rule(
     """
     params = CreateMealplanRuleParam(day=day, entryType=entryType, queryFilterString=queryFilterString)
     return await get_client().create_mealplan_rule(
-        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -1561,7 +1579,8 @@ async def update_mealplan_rule(
     """
     params = UpdateMealplanRuleParam(day=day, entryType=entryType, queryFilterString=queryFilterString)
     return await get_client().update_mealplan_rule(
-        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -1624,7 +1643,8 @@ async def create_shopping_list(
     """
     params = CreateShoppingListParam(name=name, extras=extras)
     return await get_client().create_shopping_list(
-        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -1642,7 +1662,8 @@ async def update_shopping_list(
     """
     params = UpdateShoppingListParam(name=name, extras=extras)
     return await get_client().update_shopping_list(
-        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -1687,7 +1708,7 @@ async def add_recipe_to_shopping_list(
         id: The ID of the shopping list (required).
         recipeId: The ID of the recipe whose ingredients to add (required).
     """
-    return await get_client().add_recipe_to_shopping_list(id, recipeId, get_user_token())
+    return await get_client().add_recipe_to_shopping_list(id, recipeId, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 @mcp.tool()
 async def remove_recipe_from_shopping_list(
@@ -1700,7 +1721,7 @@ async def remove_recipe_from_shopping_list(
         id: The ID of the shopping list (required).
         recipeId: The ID of the recipe whose ingredients to remove (required).
     """
-    return await get_client().remove_recipe_from_shopping_list(id, recipeId, get_user_token())
+    return await get_client().remove_recipe_from_shopping_list(id, recipeId, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 # =============================================================================
 # Shopping Items
@@ -1773,7 +1794,8 @@ async def create_shopping_item(
     payload = params.model_dump(exclude_unset=True, exclude_none=True)
     payload = {k: v for k, v in payload.items() if not (isinstance(v, str) and v == "" and k in ("foodId", "labelId", "unitId"))}
     return await get_client().create_shopping_item(
-        payload, get_user_token()
+        payload, get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -1809,7 +1831,8 @@ async def update_shopping_item(
         unitId=unitId, extras=extras
     )
     return await get_client().update_shopping_item(
-        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -1832,7 +1855,7 @@ async def bulk_create_shopping_items(
     Args:
         items: List of shopping item objects (required).
     """
-    return await get_client().bulk_create_shopping_items(items, get_user_token())
+    return await get_client().bulk_create_shopping_items(items, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 @mcp.tool()
 async def bulk_update_shopping_items(
@@ -1843,7 +1866,7 @@ async def bulk_update_shopping_items(
     Args:
         items: List of shopping item objects with id fields (required).
     """
-    return await get_client().bulk_update_shopping_items(items, get_user_token())
+    return await get_client().bulk_update_shopping_items(items, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 @mcp.tool()
 async def bulk_delete_shopping_items(
@@ -1905,7 +1928,8 @@ async def create_label(
     """
     params = CreateLabelParam(name=name, color=color)
     return await get_client().create_label(
-        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -1923,7 +1947,8 @@ async def update_label(
     """
     params = UpdateLabelParam(name=name, color=color)
     return await get_client().update_label(
-        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -1988,7 +2013,8 @@ async def create_timeline_event(
     """
     params = CreateTimelineEventParam(recipeId=recipeId, eventType=eventType, message=message)
     return await get_client().create_timeline_event(
-        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -2006,7 +2032,8 @@ async def update_timeline_event(
     """
     params = UpdateTimelineEventParam(eventType=eventType, message=message)
     return await get_client().update_timeline_event(
-        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -2065,7 +2092,8 @@ async def create_shared_recipe(
     """
     params = CreateSharedRecipeParam(recipeId=recipeId)
     return await get_client().create_shared_recipe(
-        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -2134,7 +2162,8 @@ async def create_recipe_action(
     if url:
         payload["url"] = url
     return await get_client().create_recipe_action(
-        payload, get_user_token()
+        payload, get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -2155,7 +2184,8 @@ async def update_recipe_action(
     return await get_client().update_recipe_action(
         id, dict(filter(lambda x: x[1] is not None,
             [("name", name), ("recipeActionType", recipeActionType), ("description", description)])),
-        get_user_token()
+        get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -2231,7 +2261,8 @@ async def create_event_notification(
     """
     params = CreateEventNotificationParam(name=name, enabled=enabled)
     return await get_client().create_event_notification(
-        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -2249,7 +2280,8 @@ async def update_event_notification(
     """
     params = UpdateEventNotificationParam(name=name, enabled=enabled)
     return await get_client().update_event_notification(
-        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -2325,7 +2357,8 @@ async def create_webhook(
     """
     params = CreateWebhookParam(name=name, url=url, enabled=enabled)
     return await get_client().create_webhook(
-        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -2345,7 +2378,8 @@ async def update_webhook(
     """
     params = UpdateWebhookParam(name=name, url=url, enabled=enabled)
     return await get_client().update_webhook(
-        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()
@@ -2405,7 +2439,8 @@ async def create_invitation(
     """
     return await get_client().create_invitation(
         {"uses": uses, "groupId": groupId or None, "householdId": householdId or None},
-        get_user_token()
+        get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool()

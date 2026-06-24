@@ -57,9 +57,18 @@ def _filter_fields(data: Any, common_set: set[str]) -> Any:
     if isinstance(data, dict):
         if "items" in data and isinstance(data.get("items"), list):
             return {**data, "items": [_filter_fields(item, common_set) for item in data["items"]]}
-        return {k: v for k, v in data.items() if k in common_set}
+        return _strip_nulls({k: v for k, v in data.items() if k in common_set})
     if isinstance(data, list):
         return [_filter_fields(item, common_set) for item in data]
+    return data
+
+
+def _strip_nulls(data: Any, strip_empty: bool = False) -> Any:
+    if isinstance(data, dict):
+        return {k: _strip_nulls(v, strip_empty) for k, v in data.items()
+                if v is not None and (not strip_empty or v != "")}
+    if isinstance(data, list):
+        return [_strip_nulls(item, strip_empty) for item in data]
     return data
 
 
@@ -88,7 +97,7 @@ class MealieClient:
                 return {}
             if response.headers.get("content-type", "").startswith("application/json"):
                 data = response.json()
-                return data if data is not None else {}
+                return _strip_nulls(data, strip_empty=False) if data is not None else {}
             return {"text": response.text}
 
     async def get(self, path: str, api_key: Optional[str] = None, **kwargs: Any) -> Any:
@@ -130,17 +139,26 @@ class MealieClient:
     async def create_recipe(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
         return await self.post("/api/recipes", api_key, json=_normalize_payload(payload))
 
-    async def update_recipe(self, slug: str, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return await self.put(f"/api/recipes/{slug}", api_key, json=_normalize_payload(payload))
+    async def update_recipe(self, slug: str, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.put(f"/api/recipes/{slug}", api_key, json=_normalize_payload(payload))
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["recipe"])
+        return data
 
-    async def patch_recipe(self, slug: str, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return await self.patch(f"/api/recipes/{slug}", api_key, json=_normalize_payload(payload))
+    async def patch_recipe(self, slug: str, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.patch(f"/api/recipes/{slug}", api_key, json=_normalize_payload(payload))
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["recipe"])
+        return data
 
     async def delete_recipe_by_slug(self, slug: str, api_key: Optional[str] = None) -> Any:
         return await self.delete(f"/api/recipes/{slug}", api_key)
 
-    async def duplicate_recipe(self, slug: str, api_key: Optional[str] = None) -> Any:
-        return await self.post(f"/api/recipes/{slug}/duplicate", api_key, json={})
+    async def duplicate_recipe(self, slug: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post(f"/api/recipes/{slug}/duplicate", api_key, json={})
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["recipe"])
+        return data
 
     async def update_recipe_last_made(self, slug: str, api_key: Optional[str] = None) -> Any:
         now = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -229,11 +247,17 @@ class MealieClient:
             data = _filter_fields(data, COMMON_FIELDS["category"])
         return data
 
-    async def create_category(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return await self.post("/api/organizers/categories", api_key, json=payload)
+    async def create_category(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/organizers/categories", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["category"])
+        return data
 
-    async def update_category(self, category_id: str, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return await self.put(f"/api/organizers/categories/{category_id}", api_key, json=payload)
+    async def update_category(self, category_id: str, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.put(f"/api/organizers/categories/{category_id}", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["category"])
+        return data
 
     async def delete_category_by_id(self, category_id: str, api_key: Optional[str] = None) -> Any:
         return await self.delete(f"/api/organizers/categories/{category_id}", api_key)
@@ -266,11 +290,17 @@ class MealieClient:
             data = _filter_fields(data, COMMON_FIELDS["tag"])
         return data
 
-    async def create_tag(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return await self.post("/api/organizers/tags", api_key, json=payload)
+    async def create_tag(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/organizers/tags", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["tag"])
+        return data
 
-    async def update_tag(self, tag_id: str, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return await self.put(f"/api/organizers/tags/{tag_id}", api_key, json=payload)
+    async def update_tag(self, tag_id: str, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.put(f"/api/organizers/tags/{tag_id}", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["tag"])
+        return data
 
     async def delete_tag_by_id(self, tag_id: str, api_key: Optional[str] = None) -> Any:
         return await self.delete(f"/api/organizers/tags/{tag_id}", api_key)
@@ -297,11 +327,17 @@ class MealieClient:
             data = _filter_fields(data, COMMON_FIELDS["tool"])
         return data
 
-    async def create_tool(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return await self.post("/api/organizers/tools", api_key, json=payload)
+    async def create_tool(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/organizers/tools", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["tool"])
+        return data
 
-    async def update_tool(self, tool_id: str, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return await self.put(f"/api/organizers/tools/{tool_id}", api_key, json=payload)
+    async def update_tool(self, tool_id: str, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.put(f"/api/organizers/tools/{tool_id}", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["tool"])
+        return data
 
     async def delete_tool_by_id(self, tool_id: str, api_key: Optional[str] = None) -> Any:
         return await self.delete(f"/api/organizers/tools/{tool_id}", api_key)
@@ -322,8 +358,11 @@ class MealieClient:
             data = _filter_fields(data, COMMON_FIELDS["food"])
         return data
 
-    async def create_food(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return await self.post("/api/foods", api_key, json=payload)
+    async def create_food(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/foods", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["food"])
+        return data
 
     def _strip_nested(self, d: dict[str, Any]) -> dict[str, Any]:
         skip_keys = {"createdAt", "updatedAt", "householdsWithIngredientFood"}
@@ -338,22 +377,31 @@ class MealieClient:
             result[k] = v
         return result
 
-    async def update_food(self, food_id: str, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
+    async def update_food(self, food_id: str, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         try:
             existing = await self.get(f"/api/foods/{food_id}", api_key)
             if isinstance(existing, dict):
                 merged = self._strip_nested(existing)
                 merged.update(payload)
-                return await self.put(f"/api/foods/{food_id}", api_key, json=merged)
+                data = await self.put(f"/api/foods/{food_id}", api_key, json=merged)
+                if not include_all_fields and isinstance(data, dict):
+                    data = _filter_fields(data, COMMON_FIELDS["food"])
+                return data
         except Exception:
             pass
-        return await self.put(f"/api/foods/{food_id}", api_key, json=payload)
+        data = await self.put(f"/api/foods/{food_id}", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["food"])
+        return data
 
     async def delete_food_by_id(self, food_id: str, api_key: Optional[str] = None) -> Any:
         return await self.delete(f"/api/foods/{food_id}", api_key)
 
-    async def merge_foods(self, food_to_keep: str, food_to_merge: str, api_key: Optional[str] = None) -> Any:
-        return await self.put("/api/foods/merge", api_key, json={"fromFood": food_to_keep, "toFood": food_to_merge})
+    async def merge_foods(self, food_to_keep: str, food_to_merge: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.put("/api/foods/merge", api_key, json={"fromFood": food_to_keep, "toFood": food_to_merge})
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["food"])
+        return data
 
     # =========================================================================
     # Units
@@ -371,25 +419,37 @@ class MealieClient:
             data = _filter_fields(data, COMMON_FIELDS["unit"])
         return data
 
-    async def create_unit(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return await self.post("/api/units", api_key, json=payload)
+    async def create_unit(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/units", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["unit"])
+        return data
 
-    async def update_unit(self, unit_id: str, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
+    async def update_unit(self, unit_id: str, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         try:
             existing = await self.get(f"/api/units/{unit_id}", api_key)
             if isinstance(existing, dict):
                 merged = self._strip_nested(existing)
                 merged.update(payload)
-                return await self.put(f"/api/units/{unit_id}", api_key, json=merged)
+                data = await self.put(f"/api/units/{unit_id}", api_key, json=merged)
+                if not include_all_fields and isinstance(data, dict):
+                    data = _filter_fields(data, COMMON_FIELDS["unit"])
+                return data
         except Exception:
             pass
-        return await self.put(f"/api/units/{unit_id}", api_key, json=payload)
+        data = await self.put(f"/api/units/{unit_id}", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["unit"])
+        return data
 
     async def delete_unit_by_id(self, unit_id: str, api_key: Optional[str] = None) -> Any:
         return await self.delete(f"/api/units/{unit_id}", api_key)
 
-    async def merge_units(self, unit_to_keep: str, unit_to_merge: str, api_key: Optional[str] = None) -> Any:
-        return await self.put("/api/units/merge", api_key, json={"fromUnit": unit_to_keep, "toUnit": unit_to_merge})
+    async def merge_units(self, unit_to_keep: str, unit_to_merge: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.put("/api/units/merge", api_key, json={"fromUnit": unit_to_keep, "toUnit": unit_to_merge})
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["unit"])
+        return data
 
     # =========================================================================
     # Comments
@@ -407,10 +467,13 @@ class MealieClient:
             data = _filter_fields(data, COMMON_FIELDS["comment"])
         return data
 
-    async def create_comment(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return await self.post("/api/comments", api_key, json=payload)
+    async def create_comment(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/comments", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["comment"])
+        return data
 
-    async def update_comment(self, comment_id: str, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
+    async def update_comment(self, comment_id: str, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         try:
             existing = await self.get(f"/api/comments/{comment_id}", api_key)
             if isinstance(existing, dict):
@@ -418,10 +481,16 @@ class MealieClient:
                 if "recipe" in existing and isinstance(existing["recipe"], dict) and "id" in existing["recipe"]:
                     merged["recipe"] = {"id": existing["recipe"]["id"]}
                 merged.update(payload)
-                return await self.put(f"/api/comments/{comment_id}", api_key, json=merged)
+                data = await self.put(f"/api/comments/{comment_id}", api_key, json=merged)
+                if not include_all_fields and isinstance(data, dict):
+                    data = _filter_fields(data, COMMON_FIELDS["comment"])
+                return data
         except Exception:
             pass
-        return await self.put(f"/api/comments/{comment_id}", api_key, json=payload)
+        data = await self.put(f"/api/comments/{comment_id}", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["comment"])
+        return data
 
     async def delete_comment_by_id(self, comment_id: str, api_key: Optional[str] = None) -> Any:
         return await self.delete(f"/api/comments/{comment_id}", api_key)
@@ -442,21 +511,30 @@ class MealieClient:
             data = _filter_fields(data, COMMON_FIELDS["cookbook"])
         return data
 
-    async def create_cookbook(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return await self.post("/api/households/cookbooks", api_key, json=payload)
+    async def create_cookbook(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/households/cookbooks", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["cookbook"])
+        return data
 
-    async def update_cookbook(self, cookbook_id: str, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
+    async def update_cookbook(self, cookbook_id: str, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         try:
             existing = await self.get(f"/api/households/cookbooks/{cookbook_id}", api_key)
             if isinstance(existing, dict):
                 merged = self._strip_nested(existing)
                 merged.update(payload)
-                return await self.put(f"/api/households/cookbooks/{cookbook_id}", api_key, json=merged)
+                data = await self.put(f"/api/households/cookbooks/{cookbook_id}", api_key, json=merged)
+                if not include_all_fields and isinstance(data, dict):
+                    data = _filter_fields(data, COMMON_FIELDS["cookbook"])
+                return data
         except Exception:
             pass
-        return await self.put(f"/api/households/cookbooks/{cookbook_id}", api_key, json=payload)
+        data = await self.put(f"/api/households/cookbooks/{cookbook_id}", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["cookbook"])
+        return data
 
-    async def update_cookbooks(self, cookbooks: list[dict[str, Any]], api_key: Optional[str] = None) -> Any:
+    async def update_cookbooks(self, cookbooks: list[dict[str, Any]], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         enriched = []
         for cb in cookbooks:
             cb_id = cb.get("id")
@@ -473,7 +551,9 @@ class MealieClient:
             enriched.append(cb)
         result = await self.put("/api/households/cookbooks", api_key, json=enriched)
         if isinstance(result, list):
-            return {"cookbooks": result}
+            result = {"cookbooks": result}
+        if not include_all_fields and isinstance(result, dict):
+            result = _filter_fields(result, COMMON_FIELDS["cookbook"])
         return result
 
     async def delete_cookbook_by_id(self, cookbook_id: str, api_key: Optional[str] = None) -> Any:
@@ -506,13 +586,19 @@ class MealieClient:
             data = _filter_fields(data, COMMON_FIELDS["mealplan"])
         return data
 
-    async def create_mealplan(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return await self.post("/api/households/mealplans", api_key, json=payload)
+    async def create_mealplan(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/households/mealplans", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["mealplan"])
+        return data
 
-    async def create_random_mealplan(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return await self.post("/api/households/mealplans/random", api_key, json=payload)
+    async def create_random_mealplan(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/households/mealplans/random", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["mealplan"])
+        return data
 
-    async def update_mealplan(self, mealplan_id: Any, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
+    async def update_mealplan(self, mealplan_id: Any, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         try:
             existing = await self.get(f"/api/households/mealplans/{mealplan_id}", api_key)
             if isinstance(existing, dict):
@@ -520,10 +606,16 @@ class MealieClient:
                 if "recipe" in existing and isinstance(existing["recipe"], dict) and "id" in existing["recipe"]:
                     merged["recipe"] = {"id": existing["recipe"]["id"]}
                 merged.update(payload)
-                return await self.put(f"/api/households/mealplans/{mealplan_id}", api_key, json=merged)
+                data = await self.put(f"/api/households/mealplans/{mealplan_id}", api_key, json=merged)
+                if not include_all_fields and isinstance(data, dict):
+                    data = _filter_fields(data, COMMON_FIELDS["mealplan"])
+                return data
         except Exception:
             pass
-        return await self.put(f"/api/households/mealplans/{mealplan_id}", api_key, json=payload)
+        data = await self.put(f"/api/households/mealplans/{mealplan_id}", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["mealplan"])
+        return data
 
     async def delete_mealplan_by_id(self, mealplan_id: Any, api_key: Optional[str] = None) -> Any:
         return await self.delete(f"/api/households/mealplans/{mealplan_id}", api_key)
@@ -544,11 +636,17 @@ class MealieClient:
             data = _filter_fields(data, COMMON_FIELDS["mealplan_rule"])
         return data
 
-    async def create_mealplan_rule(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return await self.post("/api/households/mealplans/rules", api_key, json=payload)
+    async def create_mealplan_rule(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/households/mealplans/rules", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["mealplan_rule"])
+        return data
 
-    async def update_mealplan_rule(self, rule_id: str, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return await self.put(f"/api/households/mealplans/rules/{rule_id}", api_key, json=payload)
+    async def update_mealplan_rule(self, rule_id: str, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.put(f"/api/households/mealplans/rules/{rule_id}", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["mealplan_rule"])
+        return data
 
     async def delete_mealplan_rule_by_id(self, rule_id: str, api_key: Optional[str] = None) -> Any:
         return await self.delete(f"/api/households/mealplans/rules/{rule_id}", api_key)
@@ -569,19 +667,28 @@ class MealieClient:
             data = _filter_fields(data, COMMON_FIELDS["shopping_list"])
         return data
 
-    async def create_shopping_list(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return await self.post("/api/households/shopping/lists", api_key, json=payload)
+    async def create_shopping_list(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/households/shopping/lists", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["shopping_list"])
+        return data
 
-    async def update_shopping_list(self, list_id: str, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
+    async def update_shopping_list(self, list_id: str, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         try:
             existing = await self.get(f"/api/households/shopping/lists/{list_id}", api_key)
             if isinstance(existing, dict):
                 merged = self._strip_nested(existing)
                 merged.update(payload)
-                return await self.put(f"/api/households/shopping/lists/{list_id}", api_key, json=merged)
+                data = await self.put(f"/api/households/shopping/lists/{list_id}", api_key, json=merged)
+                if not include_all_fields and isinstance(data, dict):
+                    data = _filter_fields(data, COMMON_FIELDS["shopping_list"])
+                return data
         except Exception:
             pass
-        return await self.put(f"/api/households/shopping/lists/{list_id}", api_key, json=payload)
+        data = await self.put(f"/api/households/shopping/lists/{list_id}", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["shopping_list"])
+        return data
 
     async def delete_shopping_list_by_id(self, list_id: str, api_key: Optional[str] = None) -> Any:
         return await self.delete(f"/api/households/shopping/lists/{list_id}", api_key)
@@ -589,11 +696,17 @@ class MealieClient:
     async def update_shopping_list_label_settings(self, list_id: str, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
         return await self.put(f"/api/households/shopping/lists/{list_id}/label-settings", api_key, json=[payload])
 
-    async def add_recipe_to_shopping_list(self, list_id: str, recipe_id: str, api_key: Optional[str] = None) -> Any:
-        return await self.post(f"/api/households/shopping/lists/{list_id}/recipe", api_key, json=[{"recipeId": recipe_id}])
+    async def add_recipe_to_shopping_list(self, list_id: str, recipe_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post(f"/api/households/shopping/lists/{list_id}/recipe", api_key, json=[{"recipeId": recipe_id}])
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["shopping_list"])
+        return data
 
-    async def remove_recipe_from_shopping_list(self, list_id: str, recipe_id: str, api_key: Optional[str] = None) -> Any:
-        return await self.post(f"/api/households/shopping/lists/{list_id}/recipe/{recipe_id}/delete", api_key)
+    async def remove_recipe_from_shopping_list(self, list_id: str, recipe_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post(f"/api/households/shopping/lists/{list_id}/recipe/{recipe_id}/delete", api_key)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["shopping_list"])
+        return data
 
     # =========================================================================
     # Shopping Items
@@ -611,20 +724,35 @@ class MealieClient:
             data = _filter_fields(data, COMMON_FIELDS["shopping_item"])
         return data
 
-    async def create_shopping_item(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return await self.post("/api/households/shopping/items", api_key, json=payload)
+    async def create_shopping_item(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/households/shopping/items", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["shopping_item"])
+        return data
 
-    async def update_shopping_item(self, item_id: str, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return await self.put(f"/api/households/shopping/items/{item_id}", api_key, json=payload)
+    async def update_shopping_item(self, item_id: str, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.put(f"/api/households/shopping/items/{item_id}", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["shopping_item"])
+        return data
 
-    async def delete_shopping_item_by_id(self, item_id: str, api_key: Optional[str] = None) -> Any:
-        return await self.delete(f"/api/households/shopping/items/{item_id}", api_key)
+    async def bulk_create_shopping_items(self, items: list[dict[str, Any]], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/households/shopping/items/create-bulk", api_key, json=items)
+        if not include_all_fields:
+            if isinstance(data, list):
+                data = _filter_fields(data, COMMON_FIELDS["shopping_item"])
+            elif isinstance(data, dict):
+                data = _filter_fields(data, COMMON_FIELDS["shopping_item"])
+        return data
 
-    async def bulk_create_shopping_items(self, items: list[dict[str, Any]], api_key: Optional[str] = None) -> Any:
-        return await self.post("/api/households/shopping/items/create-bulk", api_key, json=items)
-
-    async def bulk_update_shopping_items(self, items: list[dict[str, Any]], api_key: Optional[str] = None) -> Any:
-        return await self.put("/api/households/shopping/items", api_key, json=items)
+    async def bulk_update_shopping_items(self, items: list[dict[str, Any]], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.put("/api/households/shopping/items", api_key, json=items)
+        if not include_all_fields:
+            if isinstance(data, list):
+                data = _filter_fields(data, COMMON_FIELDS["shopping_item"])
+            elif isinstance(data, dict):
+                data = _filter_fields(data, COMMON_FIELDS["shopping_item"])
+        return data
 
     async def bulk_delete_shopping_items(self, item_ids: list[str], api_key: Optional[str] = None) -> Any:
         return await self.request("DELETE", "/api/households/shopping/items", api_key, json={"ids": item_ids})
@@ -645,19 +773,28 @@ class MealieClient:
             data = _filter_fields(data, COMMON_FIELDS["label"])
         return data
 
-    async def create_label(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return await self.post("/api/groups/labels", api_key, json=payload)
+    async def create_label(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/groups/labels", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["label"])
+        return data
 
-    async def update_label(self, label_id: str, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
+    async def update_label(self, label_id: str, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         try:
             existing = await self.get(f"/api/groups/labels/{label_id}", api_key)
             if isinstance(existing, dict):
                 merged = self._strip_nested(existing)
                 merged.update(payload)
-                return await self.put(f"/api/groups/labels/{label_id}", api_key, json=merged)
+                data = await self.put(f"/api/groups/labels/{label_id}", api_key, json=merged)
+                if not include_all_fields and isinstance(data, dict):
+                    data = _filter_fields(data, COMMON_FIELDS["label"])
+                return data
         except Exception:
             pass
-        return await self.put(f"/api/groups/labels/{label_id}", api_key, json=payload)
+        data = await self.put(f"/api/groups/labels/{label_id}", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["label"])
+        return data
 
     async def delete_label_by_id(self, label_id: str, api_key: Optional[str] = None) -> Any:
         return await self.delete(f"/api/groups/labels/{label_id}", api_key)
@@ -678,12 +815,15 @@ class MealieClient:
             data = _filter_fields(data, COMMON_FIELDS["timeline_event"])
         return data
 
-    async def create_timeline_event(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
+    async def create_timeline_event(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         if "subject" not in payload:
             payload["subject"] = payload.get("message", "Timeline event")
-        return await self.post("/api/recipes/timeline/events", api_key, json=payload)
+        data = await self.post("/api/recipes/timeline/events", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["timeline_event"])
+        return data
 
-    async def update_timeline_event(self, event_id: str, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
+    async def update_timeline_event(self, event_id: str, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         try:
             existing = await self.get(f"/api/recipes/timeline/events/{event_id}", api_key)
             if isinstance(existing, dict):
@@ -691,10 +831,16 @@ class MealieClient:
                 if "recipe" in existing and isinstance(existing["recipe"], dict) and "id" in existing["recipe"]:
                     merged["recipe"] = {"id": existing["recipe"]["id"]}
                 merged.update(payload)
-                return await self.put(f"/api/recipes/timeline/events/{event_id}", api_key, json=merged)
+                data = await self.put(f"/api/recipes/timeline/events/{event_id}", api_key, json=merged)
+                if not include_all_fields and isinstance(data, dict):
+                    data = _filter_fields(data, COMMON_FIELDS["timeline_event"])
+                return data
         except Exception:
             pass
-        return await self.put(f"/api/recipes/timeline/events/{event_id}", api_key, json=payload)
+        data = await self.put(f"/api/recipes/timeline/events/{event_id}", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["timeline_event"])
+        return data
 
     async def delete_timeline_event_by_id(self, event_id: str, api_key: Optional[str] = None) -> Any:
         return await self.delete(f"/api/recipes/timeline/events/{event_id}", api_key)
@@ -718,8 +864,11 @@ class MealieClient:
             data = _filter_fields(data, COMMON_FIELDS["shared_recipe"])
         return data
 
-    async def create_shared_recipe(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return await self.post("/api/shared/recipes", api_key, json=payload)
+    async def create_shared_recipe(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/shared/recipes", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["shared_recipe"])
+        return data
 
     async def delete_shared_recipe_by_id(self, token_id: str, api_key: Optional[str] = None) -> Any:
         return await self.delete(f"/api/shared/recipes/{token_id}", api_key)
@@ -740,7 +889,7 @@ class MealieClient:
             data = _filter_fields(data, COMMON_FIELDS["recipe_action"])
         return data
 
-    async def create_recipe_action(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
+    async def create_recipe_action(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         # API expects: actionType, title, url, name (optional)
         mapped = {}
         for k, v in payload.items():
@@ -752,18 +901,27 @@ class MealieClient:
             mapped["title"] = mapped.get("name", "Action")
         if "url" not in mapped:
             mapped["url"] = ""
-        return await self.post("/api/households/recipe-actions", api_key, json=mapped)
+        data = await self.post("/api/households/recipe-actions", api_key, json=mapped)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["recipe_action"])
+        return data
 
-    async def update_recipe_action(self, action_id: str, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
+    async def update_recipe_action(self, action_id: str, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         try:
             existing = await self.get(f"/api/households/recipe-actions/{action_id}", api_key)
             if isinstance(existing, dict):
                 merged = self._strip_nested(existing)
                 merged.update(payload)
-                return await self.put(f"/api/households/recipe-actions/{action_id}", api_key, json=merged)
+                data = await self.put(f"/api/households/recipe-actions/{action_id}", api_key, json=merged)
+                if not include_all_fields and isinstance(data, dict):
+                    data = _filter_fields(data, COMMON_FIELDS["recipe_action"])
+                return data
         except Exception:
             pass
-        return await self.put(f"/api/households/recipe-actions/{action_id}", api_key, json=payload)
+        data = await self.put(f"/api/households/recipe-actions/{action_id}", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["recipe_action"])
+        return data
 
     async def delete_recipe_action_by_id(self, action_id: str, api_key: Optional[str] = None) -> Any:
         return await self.delete(f"/api/households/recipe-actions/{action_id}", api_key)
@@ -787,21 +945,30 @@ class MealieClient:
             data = _filter_fields(data, COMMON_FIELDS["event_notification"])
         return data
 
-    async def create_event_notification(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
+    async def create_event_notification(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         if "apprise_url" not in payload:
             payload["apprise_url"] = "json://"
-        return await self.post("/api/households/events/notifications", api_key, json=payload)
+        data = await self.post("/api/households/events/notifications", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["event_notification"])
+        return data
 
-    async def update_event_notification(self, notifier_id: str, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
+    async def update_event_notification(self, notifier_id: str, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         try:
             existing = await self.get(f"/api/households/events/notifications/{notifier_id}", api_key)
             if isinstance(existing, dict):
                 merged = self._strip_nested(existing)
                 merged.update(payload)
-                return await self.put(f"/api/households/events/notifications/{notifier_id}", api_key, json=merged)
+                data = await self.put(f"/api/households/events/notifications/{notifier_id}", api_key, json=merged)
+                if not include_all_fields and isinstance(data, dict):
+                    data = _filter_fields(data, COMMON_FIELDS["event_notification"])
+                return data
         except Exception:
             pass
-        return await self.put(f"/api/households/events/notifications/{notifier_id}", api_key, json=payload)
+        data = await self.put(f"/api/households/events/notifications/{notifier_id}", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["event_notification"])
+        return data
 
     async def delete_event_notification_by_id(self, notifier_id: str, api_key: Optional[str] = None) -> Any:
         return await self.delete(f"/api/households/events/notifications/{notifier_id}", api_key)
@@ -825,21 +992,30 @@ class MealieClient:
             data = _filter_fields(data, COMMON_FIELDS["webhook"])
         return data
 
-    async def create_webhook(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
+    async def create_webhook(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         if "scheduledTime" not in payload:
             payload["scheduledTime"] = "00:00:00"
-        return await self.post("/api/households/webhooks", api_key, json=payload)
+        data = await self.post("/api/households/webhooks", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["webhook"])
+        return data
 
-    async def update_webhook(self, webhook_id: str, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
+    async def update_webhook(self, webhook_id: str, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         try:
             existing = await self.get(f"/api/households/webhooks/{webhook_id}", api_key)
             if isinstance(existing, dict):
                 merged = self._strip_nested(existing)
                 merged.update(payload)
-                return await self.put(f"/api/households/webhooks/{webhook_id}", api_key, json=merged)
+                data = await self.put(f"/api/households/webhooks/{webhook_id}", api_key, json=merged)
+                if not include_all_fields and isinstance(data, dict):
+                    data = _filter_fields(data, COMMON_FIELDS["webhook"])
+                return data
         except Exception:
             pass
-        return await self.put(f"/api/households/webhooks/{webhook_id}", api_key, json=payload)
+        data = await self.put(f"/api/households/webhooks/{webhook_id}", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["webhook"])
+        return data
 
     async def delete_webhook_by_id(self, webhook_id: str, api_key: Optional[str] = None) -> Any:
         return await self.delete(f"/api/households/webhooks/{webhook_id}", api_key)
@@ -860,8 +1036,11 @@ class MealieClient:
             data = _filter_fields(data, COMMON_FIELDS["invitation"])
         return data
 
-    async def create_invitation(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return await self.post("/api/households/invitations", api_key, json=payload)
+    async def create_invitation(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/households/invitations", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["invitation"])
+        return data
 
     async def email_invitation(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
         return await self.post("/api/households/invitations/email", api_key, json=payload)
