@@ -46,6 +46,20 @@ def get_user_token() -> Optional[str]:
 # Pydantic Contract Models
 # =============================================================================
 
+class RecipeIngredientParam(BaseModel):
+    quantity: float = 0
+    unit: str = ""
+    food: str = ""
+    note: str = ""
+    display: str = ""
+    title: str = ""
+    originalText: str = ""
+
+class RecipeInstructionParam(BaseModel):
+    text: str
+    title: str = ""
+    summary: str = ""
+
 class CreateRecipeParam(BaseModel):
     name: str
     description: str = ""
@@ -341,8 +355,8 @@ async def create_recipe(
     recipeCategory: list = [],
     tags: list = [],
     tools: list = [],
-    recipeIngredient: list = [],
-    recipeInstructions: list = [],
+    recipeIngredient: list[RecipeIngredientParam] = [],
+    recipeInstructions: list[RecipeInstructionParam] = [],
     nutrition: dict = {},
     settings: dict = {},
     notes: list = [],
@@ -365,8 +379,8 @@ async def create_recipe(
         recipeCategory: List of category IDs or names.
         tags: List of tag IDs or names.
         tools: List of tool IDs or names.
-        recipeIngredient: List of ingredient objects with quantity, unit, note, food, display fields.
-        recipeInstructions: List of instruction objects with text and optional position, title fields.
+        recipeIngredient: List of ingredient objects (quantity, unit, food, note, display, title, originalText).
+        recipeInstructions: List of instruction objects (text, title, summary).
         nutrition: Nutrition information object.
         settings: Recipe settings object.
         notes: List of note objects.
@@ -379,7 +393,8 @@ async def create_recipe(
         performTime=performTime, recipeYield=recipeYield,
         recipeYieldQuantity=recipeYieldQuantity, orgURL=orgURL,
         recipeCategory=recipeCategory, tags=tags, tools=tools,
-        recipeIngredient=recipeIngredient, recipeInstructions=recipeInstructions,
+        recipeIngredient=[i.model_dump(exclude_none=True) for i in recipeIngredient],
+        recipeInstructions=[i.model_dump(exclude_none=True) for i in recipeInstructions],
         nutrition=nutrition, settings=settings, notes=notes,
         extras=extras, image=image,
     )
@@ -410,8 +425,8 @@ async def update_recipe(
     recipeCategory: list = None,
     tags: list = None,
     tools: list = None,
-    recipeIngredient: list = None,
-    recipeInstructions: list = None,
+    recipeIngredient: list[RecipeIngredientParam] = None,
+    recipeInstructions: list[RecipeInstructionParam] = None,
     nutrition: dict = None,
     settings: dict = None,
     notes: list = None,
@@ -435,8 +450,8 @@ async def update_recipe(
         recipeCategory: List of category IDs or names.
         tags: List of tag IDs or names.
         tools: List of tool IDs or names.
-        recipeIngredient: List of ingredient objects.
-        recipeInstructions: List of instruction objects.
+        recipeIngredient: List of ingredient objects (quantity, unit, food, note, display, title, originalText).
+        recipeInstructions: List of instruction objects (text, title, summary).
         nutrition: Nutrition information object.
         settings: Recipe settings object.
         notes: List of note objects.
@@ -449,7 +464,8 @@ async def update_recipe(
         performTime=performTime, recipeYield=recipeYield,
         recipeYieldQuantity=recipeYieldQuantity, orgURL=orgURL,
         recipeCategory=recipeCategory, tags=tags, tools=tools,
-        recipeIngredient=recipeIngredient, recipeInstructions=recipeInstructions,
+        recipeIngredient=[i.model_dump(exclude_none=True) for i in recipeIngredient] if recipeIngredient else None,
+        recipeInstructions=[i.model_dump(exclude_none=True) for i in recipeInstructions] if recipeInstructions else None,
         nutrition=nutrition, settings=settings, notes=notes,
         extras=extras, image=image,
     )
