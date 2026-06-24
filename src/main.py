@@ -1,6 +1,7 @@
 import datetime as dt
 import os
 import sys
+import uuid
 from contextvars import ContextVar
 from typing import Any, Optional
 
@@ -48,12 +49,13 @@ def get_user_token() -> Optional[str]:
 
 class RecipeIngredientParam(BaseModel):
     quantity: float = 0
-    unit: str = ""
-    food: str = ""
+    unit: Optional[str] = None
+    food: Optional[str] = None
     note: str = ""
     display: str = ""
     title: str = ""
     originalText: str = ""
+    referenceId: Optional[str] = None
 
 class RecipeInstructionParam(BaseModel):
     text: str
@@ -340,6 +342,45 @@ async def get_recipe_by_slug(
     """
     return await get_client().get_recipe_by_slug(slug, get_user_token(), include_all_fields=include_all_fields)
 
+
+def _format_ingredient(i) -> dict:
+    if isinstance(i, str):
+        return {"display": i, "note": i, "quantity": 0, "referenceId": str(uuid.uuid4())}
+    if isinstance(i, dict):
+        ing = {k: v for k, v in i.items() if v is not None}
+        ing.pop("unit", None)
+        ing.pop("food", None)
+        ing.setdefault("referenceId", str(uuid.uuid4()))
+        ing.setdefault("quantity", 0)
+        ing.setdefault("note", ing.get("display", ""))
+        return ing
+    return {"display": str(i), "note": str(i), "quantity": 0, "referenceId": str(uuid.uuid4())}
+
+
+async def _resolve_label_list(
+    items: list,
+    fetch_func,
+    create_func,
+    token: str
+) -> list:
+    if not items:
+        return items
+    all_items = await fetch_func(token, page=1, perPage=500)
+    items_list = all_items.get("items", [])
+    result = []
+    for item in items:
+        if isinstance(item, str):
+            found = next((x for x in items_list if x.get("name", "").lower() == item.lower()), None)
+            if found:
+                result.append({"id": found["id"], "name": found["name"], "slug": found["slug"]})
+            else:
+                created = await create_func({"name": item}, token)
+                result.append({"id": created["id"], "name": created["name"], "slug": created["slug"]})
+        elif isinstance(item, dict):
+            result.append(item)
+    return result
+
+
 @mcp.tool()
 async def create_recipe(
     name: str,
@@ -355,7 +396,7 @@ async def create_recipe(
     recipeCategory: list = [],
     tags: list = [],
     tools: list = [],
-    recipeIngredient: list[RecipeIngredientParam] = [],
+    recipeIngredient: list = [],
     recipeInstructions: list[RecipeInstructionParam] = [],
     nutrition: dict = {},
     settings: dict = {},
@@ -379,7 +420,7 @@ async def create_recipe(
         recipeCategory: List of category IDs or names.
         tags: List of tag IDs or names.
         tools: List of tool IDs or names.
-        recipeIngredient: List of ingredient objects (quantity, unit, food, note, display, title, originalText).
+        recipeIngredient: List of ingredient strings ("3 cups flour") or ingredient objects (display, quantity, note).
         recipeInstructions: List of instruction objects (text, title, summary).
         nutrition: Nutrition information object.
         settings: Recipe settings object.
@@ -387,26 +428,79 @@ async def create_recipe(
         extras: Custom key-value pairs for extended data.
         image: Image URL to scrape.
     """
-    params = CreateRecipeParam(
-        name=name, description=description, recipeServings=recipeServings,
-        totalTime=totalTime, prepTime=prepTime, cookTime=cookTime,
-        performTime=performTime, recipeYield=recipeYield,
-        recipeYieldQuantity=recipeYieldQuantity, orgURL=orgURL,
-        recipeCategory=recipeCategory, tags=tags, tools=tools,
-        recipeIngredient=[i.model_dump(exclude_none=True) for i in recipeIngredient],
-        recipeInstructions=[i.model_dump(exclude_none=True) for i in recipeInstructions],
-        nutrition=nutrition, settings=settings, notes=notes,
-        extras=extras, image=image,
+    slug_raw = await get_client().create_recipe({"name": name}, get_user_token())
+    slug = slug_raw if isinstance(slug_raw, str) else slug_raw.get("slug", "")
+    if not slug:
+        return {"error": "Failed to create recipe"}
+
+    recipe = await get_client().get_recipe_by_slug(slug, get_user_token(), include_all_fields=True)
+    if not isinstance(recipe, dict):
+        return {"slug": slug, "status": "created"}
+
+    _orig_tags = tags
+    _orig_recipeCategory = recipeCategory
+    _orig_tools = tools
+
+    recipe.update({
+        "description": description,
+        "recipeServings": recipeServings,
+        "totalTime": totalTime,
+        "prepTime": prepTime,
+        "cookTime": cookTime,
+        "performTime": performTime,
+        "recipeYield": recipeYield,
+        "recipeYieldQuantity": recipeYieldQuantity,
+        "orgURL": orgURL,
+        "recipeCategory": [],
+        "tags": [],
+        "tools": [],
+        "nutrition": nutrition,
+        "settings": settings,
+        "notes": notes,
+        "extras": extras,
+        "image": image,
+    })
+
+    if recipeIngredient is not None:
+        recipe["recipeIngredient"] = [
+            _format_ingredient(i)
+            for i in recipeIngredient
+        ]
+    if recipeInstructions is not None:
+        recipe["recipeInstructions"] = [
+            {"id": None, **i.model_dump(exclude_none=True)}
+            for i in recipeInstructions
+        ]
+
+    result = await get_client().update_recipe(
+        slug, recipe, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE
     )
-    data = await get_client().create_recipe(
-        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
-    )
-    if isinstance(data, dict):
-        return {"slug": data.get("slug", ""), "id": data.get("id", ""), "status": "created"}
-    slug = str(data)
-    recipe = await get_client().get_recipe_by_slug(slug, get_user_token())
-    if isinstance(recipe, dict):
-        return {"slug": recipe.get("slug", slug), "id": recipe.get("id", ""), "status": "created"}
+
+    token = get_user_token()
+    if _orig_tags:
+        try:
+            resolved = await _resolve_label_list(_orig_tags, get_client().get_all_tags, get_client().create_tag, token)
+            await get_client().patch_recipe(slug, {"tags": resolved}, token)
+        except Exception:
+            pass
+    if _orig_recipeCategory:
+        try:
+            resolved = await _resolve_label_list(_orig_recipeCategory, get_client().get_all_categories, get_client().create_category, token)
+            await get_client().patch_recipe(slug, {"recipeCategory": resolved}, token)
+        except Exception:
+            pass
+    if _orig_tools:
+        try:
+            resolved = await _resolve_label_list(_orig_tools, get_client().get_all_tools, get_client().create_tool, token)
+            await get_client().patch_recipe(slug, {"tools": resolved}, token)
+        except Exception:
+            pass
+
+    if _orig_tags or _orig_recipeCategory or _orig_tools:
+        result = await get_client().get_recipe_by_slug(slug, token, include_all_fields=ALLOW_ALL_AGGREGATE)
+
+    if isinstance(result, dict):
+        return {"slug": result.get("slug", slug), "id": result.get("id", ""), "status": "created"}
     return {"slug": slug, "status": "created"}
 
 @mcp.tool()
@@ -425,7 +519,7 @@ async def update_recipe(
     recipeCategory: list = None,
     tags: list = None,
     tools: list = None,
-    recipeIngredient: list[RecipeIngredientParam] = None,
+    recipeIngredient: list = None,
     recipeInstructions: list[RecipeInstructionParam] = None,
     nutrition: dict = None,
     settings: dict = None,
@@ -450,7 +544,7 @@ async def update_recipe(
         recipeCategory: List of category IDs or names.
         tags: List of tag IDs or names.
         tools: List of tool IDs or names.
-        recipeIngredient: List of ingredient objects (quantity, unit, food, note, display, title, originalText).
+        recipeIngredient: List of ingredient strings ("3 cups flour") or ingredient objects (display, quantity, note).
         recipeInstructions: List of instruction objects (text, title, summary).
         nutrition: Nutrition information object.
         settings: Recipe settings object.
@@ -458,21 +552,70 @@ async def update_recipe(
         extras: Custom key-value pairs.
         image: Image URL to scrape.
     """
-    params = UpdateRecipeParam(
-        name=name, description=description, recipeServings=recipeServings,
-        totalTime=totalTime, prepTime=prepTime, cookTime=cookTime,
-        performTime=performTime, recipeYield=recipeYield,
-        recipeYieldQuantity=recipeYieldQuantity, orgURL=orgURL,
-        recipeCategory=recipeCategory, tags=tags, tools=tools,
-        recipeIngredient=[i.model_dump(exclude_none=True) for i in recipeIngredient] if recipeIngredient else None,
-        recipeInstructions=[i.model_dump(exclude_none=True) for i in recipeInstructions] if recipeInstructions else None,
-        nutrition=nutrition, settings=settings, notes=notes,
-        extras=extras, image=image,
+    recipe = await get_client().get_recipe_by_slug(slug, get_user_token(), include_all_fields=True)
+    if not isinstance(recipe, dict):
+        return {"slug": slug, "status": "not_found"}
+
+    _update_tags = tags
+    _update_recipeCategory = recipeCategory
+    _update_tools = tools
+
+    scalar_fields = {
+        "name": name, "description": description, "recipeServings": recipeServings,
+        "totalTime": totalTime, "prepTime": prepTime, "cookTime": cookTime,
+        "performTime": performTime, "recipeYield": recipeYield,
+        "recipeYieldQuantity": recipeYieldQuantity, "orgURL": orgURL,
+        "nutrition": nutrition, "settings": settings, "notes": notes,
+        "extras": extras, "image": image,
+    }
+    recipe.update({k: v for k, v in scalar_fields.items() if v is not None})
+
+    if recipeIngredient is not None:
+        recipe["recipeIngredient"] = [
+            _format_ingredient(i)
+            for i in recipeIngredient
+        ]
+    if recipeInstructions is not None:
+        recipe["recipeInstructions"] = [
+            {"id": None, **i.model_dump(exclude_none=True)}
+            for i in recipeInstructions
+        ]
+
+    if _update_tags is not None:
+        recipe["tags"] = []
+    if _update_recipeCategory is not None:
+        recipe["recipeCategory"] = []
+    if _update_tools is not None:
+        recipe["tools"] = []
+
+    result = await get_client().update_recipe(
+        slug, recipe, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE
     )
-    return await get_client().patch_recipe(
-        slug, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
-        include_all_fields=ALLOW_ALL_AGGREGATE
-    )
+
+    token = get_user_token()
+    if _update_tags is not None:
+        try:
+            resolved = await _resolve_label_list(_update_tags, get_client().get_all_tags, get_client().create_tag, token)
+            await get_client().patch_recipe(slug, {"tags": resolved}, token)
+        except Exception:
+            pass
+    if _update_recipeCategory is not None:
+        try:
+            resolved = await _resolve_label_list(_update_recipeCategory, get_client().get_all_categories, get_client().create_category, token)
+            await get_client().patch_recipe(slug, {"recipeCategory": resolved}, token)
+        except Exception:
+            pass
+    if _update_tools is not None:
+        try:
+            resolved = await _resolve_label_list(_update_tools, get_client().get_all_tools, get_client().create_tool, token)
+            await get_client().patch_recipe(slug, {"tools": resolved}, token)
+        except Exception:
+            pass
+
+    if _update_tags is not None or _update_recipeCategory is not None or _update_tools is not None:
+        result = await get_client().get_recipe_by_slug(slug, token, include_all_fields=ALLOW_ALL_AGGREGATE)
+
+    return result
 
 @mcp.tool()
 async def delete_recipe_by_slug(

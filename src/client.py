@@ -7,15 +7,11 @@ import httpx
 
 
 def _normalize_datetime(value: str) -> str:
-    if re.match(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$', value):
-        parsed = dt.datetime.fromisoformat(value)
+    normalized = value.replace("Z", "+00:00")
+    if re.match(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?[+-]\d{2}:\d{2}$', normalized):
+        parsed = dt.datetime.fromisoformat(normalized)
         parsed = parsed.astimezone(dt.timezone.utc)
         return parsed.strftime('%Y-%m-%d %H:%M:%S')
-    if re.match(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}', value):
-        raise ValueError(
-            f"Invalid datetime: {value}. Timezone offset is required. "
-            "Must use format: 2026-06-22T15:00:00-04:00"
-        )
     return value
 
 

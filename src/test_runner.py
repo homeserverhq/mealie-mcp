@@ -943,6 +943,176 @@ async def main():
         await run_test(session, "Z1 bulk_delete_shopping_items", "bulk_delete_shopping_items", {"ids": _z1_ids})
 
         # =========================================================================
+        # Phase 20: Recipe Ingredient/Instruction Verification
+        # =========================================================================
+        log("\n=== Phase 20: Recipe Ingredient/Instruction Verification ===")
+
+        INGREDIENT_TEST_DATA = [
+            "3 small green cabbages (outer leaves removed, cores trimmed to create pockets)",
+            "1 lb large shrimp (peeled and deveined)",
+            "12 oz smoked sausage (kielbasa or andouille, sliced)",
+            "8 oz bacon (chopped)",
+            "1 red bell pepper (diced)",
+            "1 green bell pepper (diced)",
+            "1 small onion (diced)",
+            "3 cloves garlic (minced)",
+            "2 tbsp Cajun seasoning (or Old Bay)",
+            "1 tsp smoked paprika",
+            "1/4 cup olive oil or melted butter",
+            "Fresh parsley (for garnish)",
+            "Salt, black pepper, and crushed red pepper flakes (to taste)",
+        ]
+
+        INSTRUCTION_TEST_DATA = [
+            {"text": "Preheat your oven to 375\u00b0F (190\u00b0C).", "title": "Prep Oven"},
+            {"text": "In a large skillet over medium heat, cook the chopped bacon until crispy. Remove the bacon bits with a slotted spoon and set aside on a paper towel, leaving the rendered fat in the pan.", "title": "Crisp the Bacon"},
+            {"text": "In the same skillet with the bacon fat, add the sliced smoked sausage. Brown for 3-5 minutes until edges are slightly caramelized. Remove sausage and set aside.", "title": "Brown the Sausage"},
+            {"text": "Add the olive oil (or melted butter) to the skillet. Saut\u00e9 the diced onion and bell peppers until they begin to soften. Add the minced garlic and cook for another minute until fragrant.", "title": "Saut\u00e9 Aromatics"},
+            {"text": "Add the shrimp and the Cajun seasoning, smoked paprika, salt, pepper, and red pepper flakes to the skillet. Cook just until the shrimp are pink and opaque. Remove from heat.", "title": "Cook the Shrimp"},
+            {"text": "In a large mixing bowl, combine the cooked shrimp, sausage, peppers, onions, garlic, and the reserved crispy bacon bits. Toss everything together to coat in the remaining pan juices.", "title": "Combine Filling"},
+            {"text": "Carefully place the trimmed cabbage pockets into a baking dish. Spoon the savory shrimp and sausage mixture into the center of each cabbage pocket, pressing down slightly to pack it in.", "title": "Stuff the Cabbage"},
+            {"text": "Cover the baking dish with foil and bake for 20-25 minutes, or until the cabbage leaves are tender. Remove the foil and bake for an additional 5-10 minutes if you prefer a slightly charred edge on the cabbage.", "title": "Bake to Perfection"},
+            {"text": "Garnish with fresh parsley and serve immediately.", "title": "Garnish and Serve"},
+        ]
+
+        CATEGORY_TEST_DATA = ["Main Course", "Low Carb"]
+
+        await run_test_with_store(
+            session, "AA1 create_recipe_with_ingredients", "create_recipe",
+            {
+                "name": make_name("CajunCabbageBoats"),
+                "description": "Savory, smoky, and slightly spicy Cajun-inspired cabbage boats stuffed with juicy shrimp, hearty sausage, and crispy bacon. A perfect low-carb, one-pan sensation!",
+                "recipeServings": 6,
+                "totalTime": "50 minutes",
+                "recipeCategory": CATEGORY_TEST_DATA,
+                "recipeIngredient": INGREDIENT_TEST_DATA,
+                "recipeInstructions": INSTRUCTION_TEST_DATA,
+            },
+            store_key="ingredient_recipe"
+        )
+
+        ing_slug = pick_slug("ingredient_recipe")
+        if ing_slug:
+            ok = await run_test_with_store(
+                session, "AA2 fetch_recipe_with_ingredients", "get_recipe_by_slug",
+                {"slug": ing_slug, "include_all_fields": True},
+                store_key="ingredient_recipe_data"
+            )
+            ing_data = store.get("ingredient_recipe_data", {})
+            if isinstance(ing_data, dict):
+                ings = ing_data.get("recipeIngredient", [])
+                ins_list = ing_data.get("recipeInstructions", [])
+                tags = ing_data.get("tags", [])
+                cats = ing_data.get("recipeCategory", [])
+                tools = ing_data.get("tools", [])
+                servings = ing_data.get("recipeServings")
+                total_time = ing_data.get("totalTime")
+
+                ing_count = len(ings)
+                ins_count = len(ins_list)
+                tag_count = len(tags)
+                cat_count = len(cats)
+                tool_count = len(tools)
+
+                count_ok = ing_count == 13 and ins_count == 9 and tag_count == 0 and cat_count == 2 and tool_count == 0
+
+                meta_ok = servings == 6 and total_time == "50 minutes"
+
+                display_ok = True
+                bad_displays = []
+                for idx, ing in enumerate(ings):
+                    display = ing.get("display", "")
+                    expected = INGREDIENT_TEST_DATA[idx]
+                    if display != expected:
+                        display_ok = False
+                        bad_displays.append(f"ing[{idx}]: expected={expected[:40]!r}, got={display[:40]!r}")
+
+                ins_ok = True
+                bad_ins = []
+                for idx, ins in enumerate(ins_list):
+                    text = ins.get("text", "")
+                    title = ins.get("title", "")
+                    expected_text = INSTRUCTION_TEST_DATA[idx]["text"]
+                    expected_title = INSTRUCTION_TEST_DATA[idx]["title"]
+                    if text != expected_text:
+                        ins_ok = False
+                        bad_ins.append(f"ins[{idx}].text mismatch")
+                    if title != expected_title:
+                        ins_ok = False
+                        bad_ins.append(f"ins[{idx}].title mismatch")
+
+                cat_ok = True
+                cat_names = [c.get("name", "") if isinstance(c, dict) else c for c in cats]
+                if "Main Course" not in cat_names or "Low Carb" not in cat_names:
+                    cat_ok = False
+
+                all_ok = count_ok and meta_ok and display_ok and ins_ok and cat_ok
+                if all_ok:
+                    results.append({"label": "AA3 verify_recipe_ingredient_counts", "tool": "get_recipe_by_slug",
+                                    "status": "PASSED", "data": {"ingredients": ing_count, "instructions": ins_count, "tags": tag_count, "categories": cat_count, "tools": tool_count, "servings": servings, "totalTime": total_time}})
+                    log(f"  PASS AA3 verify_recipe (ing={ing_count} ins={ins_count} tags={tag_count} cats={cat_count} tools={tool_count} servings={servings} time={total_time})")
+                else:
+                    reasons = []
+                    if not count_ok:
+                        reasons.append(f"Expected 13 ing/9 ins/0 tags/2 cats/0 tools, got {ing_count}/{ins_count}/{tag_count}/{cat_count}/{tool_count}")
+                    if not meta_ok:
+                        reasons.append(f"Expected servings=6 totalTime='50 minutes', got servings={servings} totalTime={total_time!r}")
+                    if not display_ok:
+                        reasons.extend(bad_displays)
+                    if not ins_ok:
+                        reasons.extend(bad_ins)
+                    if not cat_ok:
+                        reasons.append(f"Categories missing: {cat_names}")
+                    results.append({"label": "AA3 verify_recipe_ingredient_counts", "tool": "get_recipe_by_slug",
+                                    "status": "FAILED", "reason": "; ".join(reasons)})
+                    log(f"  FAIL AA3 verify_recipe: {'; '.join(reasons)}")
+
+            UPDATED_INGREDIENTS = [
+                "3 small green cabbages (outer leaves removed, cores trimmed to create pockets)",
+                "1 lb large shrimp (peeled and deveined)",
+                "12 oz smoked sausage (kielbasa or andouille, sliced)",
+            ]
+            UPDATED_INSTRUCTIONS = [
+                {"text": "Preheat your oven to 375\u00b0F (190\u00b0C).", "title": "Prep Oven"},
+                {"text": "In a large skillet over medium heat, cook the chopped bacon until crispy. Remove the bacon bits with a slotted spoon and set aside on a paper towel, leaving the rendered fat in the pan.", "title": "Crisp the Bacon"},
+            ]
+            upd_ok = await run_test_with_store(
+                session, "AA4 update_recipe_ingredients", "update_recipe",
+                {
+                    "slug": ing_slug,
+                    "description": "Updated ingredient/instruction test",
+                    "recipeIngredient": UPDATED_INGREDIENTS,
+                    "recipeInstructions": UPDATED_INSTRUCTIONS,
+                    "tags": ["Cajun"],
+                    "recipeCategory": ["Main Course"],
+                    "tools": ["Oven"],
+                },
+                store_key="ingredient_recipe_updated"
+            )
+
+            await run_test_with_store(
+                session, "AA5 fetch_recipe_after_update", "get_recipe_by_slug",
+                {"slug": ing_slug, "include_all_fields": True},
+                store_key="ingredient_recipe_final"
+            )
+            final_data = store.get("ingredient_recipe_final", {})
+            if isinstance(final_data, dict):
+                final_ing = len(final_data.get("recipeIngredient", []))
+                final_ins = len(final_data.get("recipeInstructions", []))
+                final_tags = len(final_data.get("tags", []))
+                final_cats = len(final_data.get("recipeCategory", []))
+                final_tools = len(final_data.get("tools", []))
+                ok = final_ing == 3 and final_ins == 2 and final_tags == 1 and final_cats == 1 and final_tools == 1
+                if ok:
+                    results.append({"label": "AA6 verify_updated_ingredient_counts", "tool": "get_recipe_by_slug",
+                                    "status": "PASSED", "data": {"ingredients": final_ing, "instructions": final_ins, "tags": final_tags, "categories": final_cats, "tools": final_tools}})
+                    log(f"  PASS AA6 verify_updated_ingredient_counts (ing={final_ing} ins={final_ins} tags={final_tags} cats={final_cats} tools={final_tools})")
+                else:
+                    results.append({"label": "AA6 verify_updated_ingredient_counts", "tool": "get_recipe_by_slug",
+                                    "status": "FAILED", "reason": f"Expected 3 ing/2 ins/1 tag/1 cat/1 tool, got {final_ing}/{final_ins}/{final_tags}/{final_cats}/{final_tools}"})
+                    log(f"  FAIL AA6 verify_updated_ingredient_counts: expected 3/2/1/1/1, got {final_ing}/{final_ins}/{final_tags}/{final_cats}/{final_tools}")
+
+        # =========================================================================
         # Phase 19: Cleanup - remove all test artifacts
         # =========================================================================
         log("\n=== Phase 19: Cleanup ===")
@@ -955,6 +1125,9 @@ async def main():
             await run_test(session, "Z4 cleanup_scraped_recipe", "delete_recipe_by_slug", {"slug": scraped_slug})
         if main_slug:
             await run_test(session, "Z3 cleanup_main_recipe", "delete_recipe_by_slug", {"slug": main_slug})
+        ing_slug_cleanup = pick_slug("ingredient_recipe")
+        if ing_slug_cleanup and ing_slug_cleanup != main_slug:
+            await run_test(session, "Z6 cleanup_ingredient_recipe", "delete_recipe_by_slug", {"slug": ing_slug_cleanup})
 
         # 2. Delete O19/O20 creamy-garlic-chicken recipes (not tXXXX- pattern)
         try:
