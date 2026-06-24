@@ -467,7 +467,8 @@ async def delete_recipe_by_slug(
     Args:
         slug: The unique slug of the recipe to delete (required).
     """
-    return await get_client().delete_recipe_by_slug(slug, get_user_token())
+    await get_client().delete_recipe_by_slug(slug, get_user_token())
+    return {"success": True, "message": "Recipe deleted successfully"}
 
 @mcp.tool()
 async def duplicate_recipe(
@@ -591,7 +592,8 @@ async def delete_recipe_image(
     Args:
         slug: The slug of the recipe (required).
     """
-    return await get_client().delete_recipe_image(slug, get_user_token())
+    await get_client().delete_recipe_image(slug, get_user_token())
+    return {"success": True, "message": "Recipe image deleted successfully"}
 
 @mcp.tool()
 async def get_recipe_export_formats(
@@ -776,7 +778,8 @@ async def delete_category_by_id(
     Args:
         id: The unique ID of the category to delete (required).
     """
-    return await get_client().delete_category_by_id(id, get_user_token())
+    await get_client().delete_category_by_id(id, get_user_token())
+    return {"success": True, "message": "Category deleted successfully"}
 
 # =============================================================================
 # Tags
@@ -877,7 +880,8 @@ async def delete_tag_by_id(
     Args:
         id: The unique ID of the tag to delete (required).
     """
-    return await get_client().delete_tag_by_id(id, get_user_token())
+    await get_client().delete_tag_by_id(id, get_user_token())
+    return {"success": True, "message": "Tag deleted successfully"}
 
 # =============================================================================
 # Tools
@@ -969,7 +973,8 @@ async def delete_tool_by_id(
     Args:
         id: The unique ID of the tool to delete (required).
     """
-    return await get_client().delete_tool_by_id(id, get_user_token())
+    await get_client().delete_tool_by_id(id, get_user_token())
+    return {"success": True, "message": "Tool deleted successfully"}
 
 # =============================================================================
 # Foods
@@ -1064,7 +1069,8 @@ async def delete_food_by_id(
     Args:
         id: The unique ID of the food to delete (required).
     """
-    return await get_client().delete_food_by_id(id, get_user_token())
+    await get_client().delete_food_by_id(id, get_user_token())
+    return {"success": True, "message": "Food deleted successfully"}
 
 @mcp.tool()
 async def merge_foods(
@@ -1192,7 +1198,8 @@ async def delete_unit_by_id(
     Args:
         id: The unique ID of the unit to delete (required).
     """
-    return await get_client().delete_unit_by_id(id, get_user_token())
+    await get_client().delete_unit_by_id(id, get_user_token())
+    return {"success": True, "message": "Unit deleted successfully"}
 
 @mcp.tool()
 async def merge_units(
@@ -1286,7 +1293,8 @@ async def delete_comment_by_id(
     Args:
         id: The unique ID of the comment to delete (required).
     """
-    return await get_client().delete_comment_by_id(id, get_user_token())
+    await get_client().delete_comment_by_id(id, get_user_token())
+    return {"success": True, "message": "Comment deleted successfully"}
 
 # =============================================================================
 # Cookbooks
@@ -1387,7 +1395,8 @@ async def delete_cookbook_by_id(
     Args:
         id: The unique ID of the cookbook to delete (required).
     """
-    return await get_client().delete_cookbook_by_id(id, get_user_token())
+    await get_client().delete_cookbook_by_id(id, get_user_token())
+    return {"success": True, "message": "Cookbook deleted successfully"}
 
 @mcp.tool()
 async def update_cookbooks(
@@ -1527,7 +1536,8 @@ async def delete_mealplan_by_id(
     Args:
         id: The unique ID of the mealplan entry to delete (required).
     """
-    return await get_client().delete_mealplan_by_id(str(id), get_user_token())
+    await get_client().delete_mealplan_by_id(str(id), get_user_token())
+    return {"success": True, "message": "Mealplan deleted successfully"}
 
 # =============================================================================
 # Mealplan Rules
@@ -1614,7 +1624,8 @@ async def delete_mealplan_rule_by_id(
     Args:
         id: The unique ID of the mealplan rule to delete (required).
     """
-    return await get_client().delete_mealplan_rule_by_id(id, get_user_token())
+    await get_client().delete_mealplan_rule_by_id(id, get_user_token())
+    return {"success": True, "message": "Mealplan rule deleted successfully"}
 
 # =============================================================================
 # Shopping Lists
@@ -1697,7 +1708,8 @@ async def delete_shopping_list_by_id(
     Args:
         id: The unique ID of the shopping list to delete (required).
     """
-    return await get_client().delete_shopping_list_by_id(id, get_user_token())
+    await get_client().delete_shopping_list_by_id(id, get_user_token())
+    return {"success": True, "message": "Shopping list deleted successfully"}
 
 @mcp.tool()
 async def update_shopping_list_label_settings(
@@ -1866,7 +1878,8 @@ async def delete_shopping_item_by_id(
     Args:
         id: The unique ID of the shopping item to delete (required).
     """
-    return await get_client().delete_shopping_item_by_id(id, get_user_token())
+    await get_client().delete_shopping_item_by_id(id, get_user_token())
+    return {"success": True, "message": "Shopping item deleted successfully"}
 
 @mcp.tool()
 async def bulk_create_shopping_items(
@@ -2000,7 +2013,8 @@ async def delete_label_by_id(
     Args:
         id: The unique ID of the label to delete (required).
     """
-    return await get_client().delete_label_by_id(id, get_user_token())
+    await get_client().delete_label_by_id(id, get_user_token())
+    return {"success": True, "message": "Label deleted successfully"}
 
 # =============================================================================
 # Recipe Timeline Events
@@ -2085,7 +2099,8 @@ async def delete_timeline_event_by_id(
     Args:
         id: The unique ID of the timeline event to delete (required).
     """
-    return await get_client().delete_timeline_event_by_id(id, get_user_token())
+    await get_client().delete_timeline_event_by_id(id, get_user_token())
+    return {"success": True, "message": "Timeline event deleted successfully"}
 
 # =============================================================================
 # Shared Recipes
@@ -2145,7 +2160,8 @@ async def delete_shared_recipe_by_id(
     Args:
         id: The token ID of the shared recipe to delete (required).
     """
-    return await get_client().delete_shared_recipe_by_id(id, get_user_token())
+    await get_client().delete_shared_recipe_by_id(id, get_user_token())
+    return {"success": True, "message": "Shared recipe deleted successfully"}
 
 # =============================================================================
 # Recipe Actions
@@ -2237,7 +2253,8 @@ async def delete_recipe_action_by_id(
     Args:
         id: The unique ID of the recipe action to delete (required).
     """
-    return await get_client().delete_recipe_action_by_id(id, get_user_token())
+    await get_client().delete_recipe_action_by_id(id, get_user_token())
+    return {"success": True, "message": "Recipe action deleted successfully"}
 
 @mcp.tool()
 async def trigger_recipe_action(
@@ -2333,7 +2350,8 @@ async def delete_event_notification_by_id(
     Args:
         id: The unique ID of the event notification to delete (required).
     """
-    return await get_client().delete_event_notification_by_id(id, get_user_token())
+    await get_client().delete_event_notification_by_id(id, get_user_token())
+    return {"success": True, "message": "Event notification deleted successfully"}
 
 @mcp.tool()
 async def test_event_notification(
@@ -2431,7 +2449,8 @@ async def delete_webhook_by_id(
     Args:
         id: The unique ID of the webhook to delete (required).
     """
-    return await get_client().delete_webhook_by_id(id, get_user_token())
+    await get_client().delete_webhook_by_id(id, get_user_token())
+    return {"success": True, "message": "Webhook deleted successfully"}
 
 @mcp.tool()
 async def test_webhook(
