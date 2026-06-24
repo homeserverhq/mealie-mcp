@@ -55,6 +55,7 @@ docker run -d --name mealie-mcp \
 
 The MCP server serves at `http://mealie-mcp:6059/mcp`
 (Streamable HTTP).
+```
 
 ## ⚠️ Important Notes
 
