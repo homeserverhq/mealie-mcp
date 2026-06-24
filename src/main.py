@@ -483,10 +483,11 @@ async def bulk_update_recipe_settings(
 
 @mcp.tool()
 async def get_recipe_suggestions(
+    include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get recipe suggestions based on available foods and tools."""
-    return await get_client().get_recipe_suggestions(get_user_token())
+    return await get_client().get_recipe_suggestions(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
 
 @mcp.tool()
 async def create_recipe_from_url(
@@ -639,10 +640,11 @@ async def bulk_export_recipes(
 
 @mcp.tool()
 async def list_exports(
+    include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all bulk export data files."""
-    data = await get_client().list_exports(get_user_token())
+    data = await get_client().list_exports(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
     return {"exports": data if isinstance(data, list) else []}
 
 @mcp.tool()
@@ -670,7 +672,8 @@ async def get_all_categories(
         perPage: Number of items per page. Defaults to 50.
     """
     data = await get_client().get_all_categories(
-        get_user_token(), page=page, perPage=perPage
+        get_user_token(), page=page, perPage=perPage,
+        include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
     return {"items": json_to_toon(data)}
 
@@ -685,7 +688,7 @@ async def get_category_by_id(
         id: The unique ID of the category (required).
         include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
     """
-    return await get_client().get_category_by_id(id, get_user_token())
+    return await get_client().get_category_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
 async def get_category_by_slug(
@@ -698,14 +701,15 @@ async def get_category_by_slug(
         slug: The unique slug of the category (required).
         include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
     """
-    return await get_client().get_category_by_slug(slug, get_user_token())
+    return await get_client().get_category_by_slug(slug, get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
 async def get_empty_categories(
+    include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
     """List categories that have no associated recipes."""
-    data = await get_client().get_empty_categories(get_user_token())
+    data = await get_client().get_empty_categories(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
     return {"items": json_to_toon(data)}
 
 @mcp.tool()
@@ -767,7 +771,8 @@ async def get_all_tags(
         perPage: Number of items per page. Defaults to 50.
     """
     data = await get_client().get_all_tags(
-        get_user_token(), page=page, perPage=perPage
+        get_user_token(), page=page, perPage=perPage,
+        include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
     return {"items": json_to_toon(data)}
 
@@ -782,7 +787,7 @@ async def get_tag_by_id(
         id: The unique ID of the tag (required).
         include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
     """
-    return await get_client().get_tag_by_id(id, get_user_token())
+    return await get_client().get_tag_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
 async def get_tag_by_slug(
@@ -795,14 +800,15 @@ async def get_tag_by_slug(
         slug: The unique slug of the tag (required).
         include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
     """
-    return await get_client().get_tag_by_slug(slug, get_user_token())
+    return await get_client().get_tag_by_slug(slug, get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
 async def get_empty_tags(
+    include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
     """List tags that have no associated recipes."""
-    data = await get_client().get_empty_tags(get_user_token())
+    data = await get_client().get_empty_tags(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
     return {"items": json_to_toon(data)}
 
 @mcp.tool()
@@ -864,7 +870,8 @@ async def get_all_tools(
         perPage: Number of items per page. Defaults to 50.
     """
     data = await get_client().get_all_tools(
-        get_user_token(), page=page, perPage=perPage
+        get_user_token(), page=page, perPage=perPage,
+        include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
     return {"items": json_to_toon(data)}
 
@@ -879,7 +886,7 @@ async def get_tool_by_id(
         id: The unique ID of the tool (required).
         include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
     """
-    return await get_client().get_tool_by_id(id, get_user_token())
+    return await get_client().get_tool_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
 async def get_tool_by_slug(
@@ -892,7 +899,7 @@ async def get_tool_by_slug(
         slug: The unique slug of the tool (required).
         include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
     """
-    return await get_client().get_tool_by_slug(slug, get_user_token())
+    return await get_client().get_tool_by_slug(slug, get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
 async def create_tool(
@@ -953,7 +960,8 @@ async def get_all_foods(
         perPage: Number of items per page. Defaults to 50.
     """
     data = await get_client().get_all_foods(
-        get_user_token(), page=page, perPage=perPage
+        get_user_token(), page=page, perPage=perPage,
+        include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
     return {"items": json_to_toon(data)}
 
@@ -968,7 +976,7 @@ async def get_food_by_id(
         id: The unique ID of the food (required).
         include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
     """
-    return await get_client().get_food_by_id(id, get_user_token())
+    return await get_client().get_food_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
 async def create_food(
@@ -1058,7 +1066,8 @@ async def get_all_units(
         perPage: Number of items per page. Defaults to 50.
     """
     data = await get_client().get_all_units(
-        get_user_token(), page=page, perPage=perPage
+        get_user_token(), page=page, perPage=perPage,
+        include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
     return {"items": json_to_toon(data)}
 
@@ -1073,7 +1082,7 @@ async def get_unit_by_id(
         id: The unique ID of the unit (required).
         include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
     """
-    return await get_client().get_unit_by_id(id, get_user_token())
+    return await get_client().get_unit_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
 async def create_unit(
@@ -1183,7 +1192,8 @@ async def get_all_comments(
         perPage: Number of items per page. Defaults to 50.
     """
     data = await get_client().get_all_comments(
-        get_user_token(), page=page, perPage=perPage
+        get_user_token(), page=page, perPage=perPage,
+        include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
     return {"items": json_to_toon(data)}
 
@@ -1198,7 +1208,7 @@ async def get_comment_by_id(
         id: The unique ID of the comment (required).
         include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
     """
-    return await get_client().get_comment_by_id(id, get_user_token())
+    return await get_client().get_comment_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
 async def create_comment(
@@ -1261,7 +1271,8 @@ async def get_all_cookbooks(
         perPage: Number of items per page. Defaults to 50.
     """
     data = await get_client().get_all_cookbooks(
-        get_user_token(), page=page, perPage=perPage
+        get_user_token(), page=page, perPage=perPage,
+        include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
     return {"items": json_to_toon(data)}
 
@@ -1276,7 +1287,7 @@ async def get_cookbook_by_id(
         id: The unique ID of the cookbook (required).
         include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
     """
-    return await get_client().get_cookbook_by_id(id, get_user_token())
+    return await get_client().get_cookbook_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
 async def create_cookbook(
@@ -1375,7 +1386,8 @@ async def get_all_mealplans(
     """
     data = await get_client().get_all_mealplans(
         get_user_token(), page=page, perPage=perPage,
-        start_date=startDate, end_date=endDate
+        start_date=startDate, end_date=endDate,
+        include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
     return {"items": json_to_toon(data)}
 
@@ -1390,14 +1402,15 @@ async def get_mealplan_by_id(
         id: The unique ID of the mealplan entry (required).
         include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
     """
-    return await get_client().get_mealplan_by_id(str(id), get_user_token())
+    return await get_client().get_mealplan_by_id(str(id), get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
 async def get_todays_meals(
+    include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get today's mealplans."""
-    data = await get_client().get_todays_meals(get_user_token())
+    data = await get_client().get_todays_meals(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
     return {"meals": data if isinstance(data, list) else []}
 
 @mcp.tool()
@@ -1495,7 +1508,8 @@ async def get_all_mealplan_rules(
         perPage: Number of items per page. Defaults to 50.
     """
     data = await get_client().get_all_mealplan_rules(
-        get_user_token(), page=page, perPage=perPage
+        get_user_token(), page=page, perPage=perPage,
+        include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
     return {"items": json_to_toon(data)}
 
@@ -1510,7 +1524,7 @@ async def get_mealplan_rule_by_id(
         id: The unique ID of the mealplan rule (required).
         include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
     """
-    return await get_client().get_mealplan_rule_by_id(id, get_user_token())
+    return await get_client().get_mealplan_rule_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
 async def create_mealplan_rule(
@@ -1579,7 +1593,8 @@ async def get_all_shopping_lists(
         perPage: Number of items per page. Defaults to 50.
     """
     data = await get_client().get_all_shopping_lists(
-        get_user_token(), page=page, perPage=perPage
+        get_user_token(), page=page, perPage=perPage,
+        include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
     return {"items": json_to_toon(data)}
 
@@ -1594,7 +1609,7 @@ async def get_shopping_list_by_id(
         id: The unique ID of the shopping list (required).
         include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
     """
-    return await get_client().get_shopping_list_by_id(id, get_user_token())
+    return await get_client().get_shopping_list_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
 async def create_shopping_list(
@@ -1705,7 +1720,8 @@ async def get_all_shopping_items(
         perPage: Number of items per page. Defaults to 50.
     """
     data = await get_client().get_all_shopping_items(
-        get_user_token(), page=page, perPage=perPage
+        get_user_token(), page=page, perPage=perPage,
+        include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
     return {"items": json_to_toon(data)}
 
@@ -1720,7 +1736,7 @@ async def get_shopping_item_by_id(
         id: The unique ID of the shopping item (required).
         include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
     """
-    return await get_client().get_shopping_item_by_id(id, get_user_token())
+    return await get_client().get_shopping_item_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
 async def create_shopping_item(
@@ -1858,7 +1874,8 @@ async def get_all_labels(
         perPage: Number of items per page. Defaults to 50.
     """
     data = await get_client().get_all_labels(
-        get_user_token(), page=page, perPage=perPage
+        get_user_token(), page=page, perPage=perPage,
+        include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
     return {"items": json_to_toon(data)}
 
@@ -1873,7 +1890,7 @@ async def get_label_by_id(
         id: The unique ID of the label (required).
         include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
     """
-    return await get_client().get_label_by_id(id, get_user_token())
+    return await get_client().get_label_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
 async def create_label(
@@ -1938,7 +1955,8 @@ async def get_all_timeline_events(
         perPage: Number of items per page. Defaults to 50.
     """
     data = await get_client().get_all_timeline_events(
-        get_user_token(), page=page, perPage=perPage
+        get_user_token(), page=page, perPage=perPage,
+        include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
     return {"items": json_to_toon(data)}
 
@@ -1953,7 +1971,7 @@ async def get_timeline_event_by_id(
         id: The unique ID of the timeline event (required).
         include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
     """
-    return await get_client().get_timeline_event_by_id(id, get_user_token())
+    return await get_client().get_timeline_event_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
 async def create_timeline_event(
@@ -2018,7 +2036,8 @@ async def get_all_shared_recipes(
         recipeId: Filter by recipe ID.
     """
     data = await get_client().get_all_shared_recipes(
-        get_user_token(), recipe_id=recipeId
+        get_user_token(), recipe_id=recipeId,
+        include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
     return {"items": json_to_toon(data)}
 
@@ -2033,7 +2052,7 @@ async def get_shared_recipe_by_id(
         id: The public token ID of the shared recipe (required).
         include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
     """
-    return await get_client().get_shared_recipe_by_id(id, get_user_token())
+    return await get_client().get_shared_recipe_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
 async def create_shared_recipe(
@@ -2078,7 +2097,8 @@ async def get_all_recipe_actions(
         perPage: Number of items per page. Defaults to 50.
     """
     data = await get_client().get_all_recipe_actions(
-        get_user_token(), page=page, perPage=perPage
+        get_user_token(), page=page, perPage=perPage,
+        include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
     return {"items": json_to_toon(data)}
 
@@ -2093,7 +2113,7 @@ async def get_recipe_action_by_id(
         id: The unique ID of the recipe action (required).
         include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
     """
-    return await get_client().get_recipe_action_by_id(id, get_user_token())
+    return await get_client().get_recipe_action_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
 async def create_recipe_action(
@@ -2180,7 +2200,8 @@ async def get_all_event_notifications(
         perPage: Number of items per page. Defaults to 50.
     """
     data = await get_client().get_all_event_notifications(
-        get_user_token(), page=page, perPage=perPage
+        get_user_token(), page=page, perPage=perPage,
+        include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
     return {"items": json_to_toon(data)}
 
@@ -2195,7 +2216,7 @@ async def get_event_notification_by_id(
         id: The unique ID of the event notification (required).
         include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
     """
-    return await get_client().get_event_notification_by_id(id, get_user_token())
+    return await get_client().get_event_notification_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
 async def create_event_notification(
@@ -2271,7 +2292,8 @@ async def get_all_webhooks(
         perPage: Number of items per page. Defaults to 50.
     """
     data = await get_client().get_all_webhooks(
-        get_user_token(), page=page, perPage=perPage
+        get_user_token(), page=page, perPage=perPage,
+        include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
     return {"items": json_to_toon(data)}
 
@@ -2286,7 +2308,7 @@ async def get_webhook_by_id(
         id: The unique ID of the webhook (required).
         include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
     """
-    return await get_client().get_webhook_by_id(id, get_user_token())
+    return await get_client().get_webhook_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
 async def create_webhook(
@@ -2361,10 +2383,11 @@ async def rerun_webhooks(
 
 @mcp.tool()
 async def get_all_invitations(
+    include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all household invitation tokens."""
-    data = await get_client().get_all_invitations(get_user_token())
+    data = await get_client().get_all_invitations(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
     return {"invitations": data if isinstance(data, list) else []}
 
 @mcp.tool()
@@ -2406,35 +2429,39 @@ async def email_invitation(
 
 @mcp.tool()
 async def get_user_profile(
+    include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get the currently logged-in user's profile."""
-    return await get_client().get_user_profile(get_user_token())
+    return await get_client().get_user_profile(get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
 async def get_user_ratings(
+    include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get all ratings from the currently logged-in user."""
-    return await get_client().get_user_ratings(get_user_token())
+    return await get_client().get_user_ratings(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
 
 @mcp.tool()
 async def get_user_rating_for_recipe(
     recipeId: str,
+    include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get the current user's rating for a specific recipe.
     Args:
         recipeId: The ID of the recipe (required).
     """
-    return await get_client().get_user_rating_for_recipe(recipeId, get_user_token())
+    return await get_client().get_user_rating_for_recipe(recipeId, get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
 async def get_user_favorites(
+    include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get all favorite recipes from the currently logged-in user."""
-    return await get_client().get_user_favorites(get_user_token())
+    return await get_client().get_user_favorites(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
 
 @mcp.tool()
 async def set_recipe_rating(
@@ -2486,28 +2513,31 @@ async def remove_recipe_favorite(
 
 @mcp.tool()
 async def get_group_info(
+    include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get the current user's group information."""
-    return await get_client().get_group_info(get_user_token())
+    return await get_client().get_group_info(get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
 async def list_group_members(
+    include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all members of the current group."""
-    return await get_client().list_group_members(get_user_token())
+    return await get_client().list_group_members(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
 
 @mcp.tool()
 async def get_group_member(
     usernameOrId: str,
+    include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a specific group member by username or ID.
     Args:
         usernameOrId: The username or ID of the member (required).
     """
-    return await get_client().get_group_member(usernameOrId, get_user_token())
+    return await get_client().get_group_member(usernameOrId, get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
 async def get_group_preferences(
@@ -2538,46 +2568,51 @@ async def get_group_storage(
 
 @mcp.tool()
 async def list_households(
+    include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all households in the group."""
-    return await get_client().list_households(get_user_token())
+    return await get_client().list_households(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
 
 @mcp.tool()
 async def get_household(
     householdSlug: str,
+    include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a specific household by its slug.
     Args:
         householdSlug: The slug of the household (required).
     """
-    return await get_client().get_household(householdSlug, get_user_token())
+    return await get_client().get_household(householdSlug, get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
 async def get_household_info(
+    include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get the current user's household information."""
-    return await get_client().get_household_info(get_user_token())
+    return await get_client().get_household_info(get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
 async def get_household_recipe(
     recipeSlug: str,
+    include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a recipe scoped to the current household.
     Args:
         recipeSlug: The slug of the recipe (required).
     """
-    return await get_client().get_household_recipe(recipeSlug, get_user_token())
+    return await get_client().get_household_recipe(recipeSlug, get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
 async def list_household_members(
+    include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all members of the current household."""
-    return await get_client().list_household_members(get_user_token())
+    return await get_client().list_household_members(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
 
 @mcp.tool()
 async def get_household_preferences(

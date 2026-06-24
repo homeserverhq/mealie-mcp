@@ -24,6 +24,45 @@ def _normalize_payload(payload: dict[str, Any]) -> dict[str, Any]:
             for k, v in payload.items()}
 
 
+COMMON_FIELDS: dict[str, set[str]] = {
+    "recipe": {"id", "name", "slug", "description", "image", "recipeYield", "totalTime", "prepTime", "cookTime", "performTime", "recipeCategory", "tags", "tools", "rating", "dateCreated", "dateUpdated", "orgURL", "settings", "nutrition", "notes", "extras", "recipeIngredient", "recipeInstructions", "recipeServings", "recipeYieldQuantity"},
+    "category": {"id", "name", "slug"},
+    "tag": {"id", "name", "slug"},
+    "tool": {"id", "name", "slug"},
+    "food": {"id", "name", "slug", "pluralName", "description", "aliases"},
+    "unit": {"id", "name", "abbreviation", "pluralName", "pluralAbbreviation", "description", "fraction", "useAbbreviation", "aliases"},
+    "comment": {"id", "text", "recipeId", "userId", "createdAt", "updatedAt"},
+    "cookbook": {"id", "name", "description", "position", "public", "queryFilterString"},
+    "mealplan": {"id", "date", "entryType", "title", "recipeId", "text"},
+    "mealplan_rule": {"id", "day", "entryType", "queryFilterString"},
+    "shopping_list": {"id", "name", "extras"},
+    "shopping_item": {"id", "note", "display", "quantity", "checked", "shoppingListId", "foodId", "labelId", "unitId", "position", "extras"},
+    "label": {"id", "name", "color"},
+    "timeline_event": {"id", "recipeId", "eventType", "message", "timestamp", "subject"},
+    "shared_recipe": {"id", "recipeId", "token"},
+    "recipe_action": {"id", "name", "actionType", "title", "url", "description"},
+    "event_notification": {"id", "name", "enabled"},
+    "webhook": {"id", "name", "url", "enabled", "scheduledTime"},
+    "invitation": {"id", "uses", "createdAt", "groupId", "householdId"},
+    "user": {"id", "username", "email", "fullName", "admin", "cacheKey"},
+    "group": {"id", "name", "slug", "categories", "preferences"},
+    "household": {"id", "name", "slug"},
+    "member": {"id", "username", "userId", "email"},
+    "rating": {"id", "recipeId", "userId", "rating", "recipeSlug"},
+    "export": {"id", "filename", "type", "timestamp"},
+}
+
+
+def _filter_fields(data: Any, common_set: set[str]) -> Any:
+    if isinstance(data, dict):
+        if "items" in data and isinstance(data.get("items"), list):
+            return {**data, "items": [_filter_fields(item, common_set) for item in data["items"]]}
+        return {k: v for k, v in data.items() if k in common_set}
+    if isinstance(data, list):
+        return [_filter_fields(item, common_set) for item in data]
+    return data
+
+
 class MealieClient:
     def __init__(self, base_url: Optional[str] = None):
         self.base_url = (base_url or os.getenv("MEALIE_BASE_URL", "")).rstrip("/")
@@ -77,10 +116,16 @@ class MealieClient:
             params["search"] = search
         if cookbook:
             params["cookbook"] = cookbook
-        return await self.get("/api/recipes", api_key, params=params)
+        data = await self.get("/api/recipes", api_key, params=params)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["recipe"])
+        return data
 
     async def get_recipe_by_slug(self, slug: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
-        return await self.get(f"/api/recipes/{slug}", api_key)
+        data = await self.get(f"/api/recipes/{slug}", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["recipe"])
+        return data
 
     async def create_recipe(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
         return await self.post("/api/recipes", api_key, json=_normalize_payload(payload))
@@ -101,8 +146,11 @@ class MealieClient:
         now = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         return await self.patch(f"/api/recipes/{slug}/last-made", api_key, json={"timestamp": now})
 
-    async def get_recipe_suggestions(self, api_key: Optional[str] = None) -> Any:
-        return await self.get("/api/recipes/suggestions", api_key)
+    async def get_recipe_suggestions(self, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/recipes/suggestions", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["recipe"])
+        return data
 
     async def create_recipe_from_url(self, url: str, api_key: Optional[str] = None, includeTags: bool = True, includeNutrition: bool = False) -> Any:
         payload: dict[str, Any] = {"url": url, "includeTags": includeTags, "includeNutrition": includeNutrition}
@@ -144,8 +192,11 @@ class MealieClient:
     async def bulk_export_recipes(self, recipes: list[str], api_key: Optional[str] = None) -> Any:
         return await self.post("/api/recipes/bulk-actions/export", api_key, json={"recipes": recipes})
 
-    async def list_exports(self, api_key: Optional[str] = None) -> Any:
-        return await self.get("/api/recipes/bulk-actions/export", api_key)
+    async def list_exports(self, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/recipes/bulk-actions/export", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["export"])
+        return data
 
     async def purge_exports(self, api_key: Optional[str] = None) -> Any:
         return await self.delete("/api/recipes/bulk-actions/export/purge", api_key)
@@ -154,17 +205,29 @@ class MealieClient:
     # Categories
     # =========================================================================
 
-    async def get_all_categories(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50) -> Any:
-        return await self.get("/api/organizers/categories", api_key, params={"page": page, "perPage": perPage})
+    async def get_all_categories(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/organizers/categories", api_key, params={"page": page, "perPage": perPage})
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["category"])
+        return data
 
-    async def get_category_by_id(self, category_id: str, api_key: Optional[str] = None) -> Any:
-        return await self.get(f"/api/organizers/categories/{category_id}", api_key)
+    async def get_category_by_id(self, category_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get(f"/api/organizers/categories/{category_id}", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["category"])
+        return data
 
-    async def get_category_by_slug(self, slug: str, api_key: Optional[str] = None) -> Any:
-        return await self.get(f"/api/organizers/categories/slug/{slug}", api_key)
+    async def get_category_by_slug(self, slug: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get(f"/api/organizers/categories/slug/{slug}", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["category"])
+        return data
 
-    async def get_empty_categories(self, api_key: Optional[str] = None) -> Any:
-        return await self.get("/api/organizers/categories/empty", api_key)
+    async def get_empty_categories(self, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/organizers/categories/empty", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["category"])
+        return data
 
     async def create_category(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
         return await self.post("/api/organizers/categories", api_key, json=payload)
@@ -179,17 +242,29 @@ class MealieClient:
     # Tags
     # =========================================================================
 
-    async def get_all_tags(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50) -> Any:
-        return await self.get("/api/organizers/tags", api_key, params={"page": page, "perPage": perPage})
+    async def get_all_tags(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/organizers/tags", api_key, params={"page": page, "perPage": perPage})
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["tag"])
+        return data
 
-    async def get_tag_by_id(self, tag_id: str, api_key: Optional[str] = None) -> Any:
-        return await self.get(f"/api/organizers/tags/{tag_id}", api_key)
+    async def get_tag_by_id(self, tag_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get(f"/api/organizers/tags/{tag_id}", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["tag"])
+        return data
 
-    async def get_tag_by_slug(self, slug: str, api_key: Optional[str] = None) -> Any:
-        return await self.get(f"/api/organizers/tags/slug/{slug}", api_key)
+    async def get_tag_by_slug(self, slug: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get(f"/api/organizers/tags/slug/{slug}", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["tag"])
+        return data
 
-    async def get_empty_tags(self, api_key: Optional[str] = None) -> Any:
-        return await self.get("/api/organizers/tags/empty", api_key)
+    async def get_empty_tags(self, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/organizers/tags/empty", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["tag"])
+        return data
 
     async def create_tag(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
         return await self.post("/api/organizers/tags", api_key, json=payload)
@@ -204,14 +279,23 @@ class MealieClient:
     # Tools
     # =========================================================================
 
-    async def get_all_tools(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50) -> Any:
-        return await self.get("/api/organizers/tools", api_key, params={"page": page, "perPage": perPage})
+    async def get_all_tools(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/organizers/tools", api_key, params={"page": page, "perPage": perPage})
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["tool"])
+        return data
 
-    async def get_tool_by_id(self, tool_id: str, api_key: Optional[str] = None) -> Any:
-        return await self.get(f"/api/organizers/tools/{tool_id}", api_key)
+    async def get_tool_by_id(self, tool_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get(f"/api/organizers/tools/{tool_id}", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["tool"])
+        return data
 
-    async def get_tool_by_slug(self, slug: str, api_key: Optional[str] = None) -> Any:
-        return await self.get(f"/api/organizers/tools/slug/{slug}", api_key)
+    async def get_tool_by_slug(self, slug: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get(f"/api/organizers/tools/slug/{slug}", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["tool"])
+        return data
 
     async def create_tool(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
         return await self.post("/api/organizers/tools", api_key, json=payload)
@@ -226,11 +310,17 @@ class MealieClient:
     # Foods
     # =========================================================================
 
-    async def get_all_foods(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50) -> Any:
-        return await self.get("/api/foods", api_key, params={"page": page, "perPage": perPage})
+    async def get_all_foods(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/foods", api_key, params={"page": page, "perPage": perPage})
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["food"])
+        return data
 
-    async def get_food_by_id(self, food_id: str, api_key: Optional[str] = None) -> Any:
-        return await self.get(f"/api/foods/{food_id}", api_key)
+    async def get_food_by_id(self, food_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get(f"/api/foods/{food_id}", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["food"])
+        return data
 
     async def create_food(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
         return await self.post("/api/foods", api_key, json=payload)
@@ -269,11 +359,17 @@ class MealieClient:
     # Units
     # =========================================================================
 
-    async def get_all_units(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50) -> Any:
-        return await self.get("/api/units", api_key, params={"page": page, "perPage": perPage})
+    async def get_all_units(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/units", api_key, params={"page": page, "perPage": perPage})
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["unit"])
+        return data
 
-    async def get_unit_by_id(self, unit_id: str, api_key: Optional[str] = None) -> Any:
-        return await self.get(f"/api/units/{unit_id}", api_key)
+    async def get_unit_by_id(self, unit_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get(f"/api/units/{unit_id}", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["unit"])
+        return data
 
     async def create_unit(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
         return await self.post("/api/units", api_key, json=payload)
@@ -299,11 +395,17 @@ class MealieClient:
     # Comments
     # =========================================================================
 
-    async def get_all_comments(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50) -> Any:
-        return await self.get("/api/comments", api_key, params={"page": page, "perPage": perPage})
+    async def get_all_comments(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/comments", api_key, params={"page": page, "perPage": perPage})
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["comment"])
+        return data
 
-    async def get_comment_by_id(self, comment_id: str, api_key: Optional[str] = None) -> Any:
-        return await self.get(f"/api/comments/{comment_id}", api_key)
+    async def get_comment_by_id(self, comment_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get(f"/api/comments/{comment_id}", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["comment"])
+        return data
 
     async def create_comment(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
         return await self.post("/api/comments", api_key, json=payload)
@@ -328,11 +430,17 @@ class MealieClient:
     # Cookbooks
     # =========================================================================
 
-    async def get_all_cookbooks(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50) -> Any:
-        return await self.get("/api/households/cookbooks", api_key, params={"page": page, "perPage": perPage})
+    async def get_all_cookbooks(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/households/cookbooks", api_key, params={"page": page, "perPage": perPage})
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["cookbook"])
+        return data
 
-    async def get_cookbook_by_id(self, cookbook_id: str, api_key: Optional[str] = None) -> Any:
-        return await self.get(f"/api/households/cookbooks/{cookbook_id}", api_key)
+    async def get_cookbook_by_id(self, cookbook_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get(f"/api/households/cookbooks/{cookbook_id}", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["cookbook"])
+        return data
 
     async def create_cookbook(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
         return await self.post("/api/households/cookbooks", api_key, json=payload)
@@ -375,19 +483,28 @@ class MealieClient:
     # Mealplans
     # =========================================================================
 
-    async def get_all_mealplans(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50, start_date: str = "", end_date: str = "") -> Any:
+    async def get_all_mealplans(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50, start_date: str = "", end_date: str = "", include_all_fields: bool = False) -> Any:
         params: dict[str, Any] = {"page": page, "perPage": perPage}
         if start_date:
             params["startDate"] = start_date
         if end_date:
             params["endDate"] = end_date
-        return await self.get("/api/households/mealplans", api_key, params=params)
+        data = await self.get("/api/households/mealplans", api_key, params=params)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["mealplan"])
+        return data
 
-    async def get_mealplan_by_id(self, mealplan_id: str, api_key: Optional[str] = None) -> Any:
-        return await self.get(f"/api/households/mealplans/{mealplan_id}", api_key)
+    async def get_mealplan_by_id(self, mealplan_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get(f"/api/households/mealplans/{mealplan_id}", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["mealplan"])
+        return data
 
-    async def get_todays_meals(self, api_key: Optional[str] = None) -> Any:
-        return await self.get("/api/households/mealplans/today", api_key)
+    async def get_todays_meals(self, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/households/mealplans/today", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["mealplan"])
+        return data
 
     async def create_mealplan(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
         return await self.post("/api/households/mealplans", api_key, json=payload)
@@ -415,11 +532,17 @@ class MealieClient:
     # Mealplan Rules
     # =========================================================================
 
-    async def get_all_mealplan_rules(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50) -> Any:
-        return await self.get("/api/households/mealplans/rules", api_key, params={"page": page, "perPage": perPage})
+    async def get_all_mealplan_rules(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/households/mealplans/rules", api_key, params={"page": page, "perPage": perPage})
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["mealplan_rule"])
+        return data
 
-    async def get_mealplan_rule_by_id(self, rule_id: str, api_key: Optional[str] = None) -> Any:
-        return await self.get(f"/api/households/mealplans/rules/{rule_id}", api_key)
+    async def get_mealplan_rule_by_id(self, rule_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get(f"/api/households/mealplans/rules/{rule_id}", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["mealplan_rule"])
+        return data
 
     async def create_mealplan_rule(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
         return await self.post("/api/households/mealplans/rules", api_key, json=payload)
@@ -434,11 +557,17 @@ class MealieClient:
     # Shopping Lists
     # =========================================================================
 
-    async def get_all_shopping_lists(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50) -> Any:
-        return await self.get("/api/households/shopping/lists", api_key, params={"page": page, "perPage": perPage})
+    async def get_all_shopping_lists(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/households/shopping/lists", api_key, params={"page": page, "perPage": perPage})
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["shopping_list"])
+        return data
 
-    async def get_shopping_list_by_id(self, list_id: str, api_key: Optional[str] = None) -> Any:
-        return await self.get(f"/api/households/shopping/lists/{list_id}", api_key)
+    async def get_shopping_list_by_id(self, list_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get(f"/api/households/shopping/lists/{list_id}", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["shopping_list"])
+        return data
 
     async def create_shopping_list(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
         return await self.post("/api/households/shopping/lists", api_key, json=payload)
@@ -470,11 +599,17 @@ class MealieClient:
     # Shopping Items
     # =========================================================================
 
-    async def get_all_shopping_items(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50) -> Any:
-        return await self.get("/api/households/shopping/items", api_key, params={"page": page, "perPage": perPage})
+    async def get_all_shopping_items(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/households/shopping/items", api_key, params={"page": page, "perPage": perPage})
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["shopping_item"])
+        return data
 
-    async def get_shopping_item_by_id(self, item_id: str, api_key: Optional[str] = None) -> Any:
-        return await self.get(f"/api/households/shopping/items/{item_id}", api_key)
+    async def get_shopping_item_by_id(self, item_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get(f"/api/households/shopping/items/{item_id}", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["shopping_item"])
+        return data
 
     async def create_shopping_item(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
         return await self.post("/api/households/shopping/items", api_key, json=payload)
@@ -498,11 +633,17 @@ class MealieClient:
     # Labels
     # =========================================================================
 
-    async def get_all_labels(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50) -> Any:
-        return await self.get("/api/groups/labels", api_key, params={"page": page, "perPage": perPage})
+    async def get_all_labels(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/groups/labels", api_key, params={"page": page, "perPage": perPage})
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["label"])
+        return data
 
-    async def get_label_by_id(self, label_id: str, api_key: Optional[str] = None) -> Any:
-        return await self.get(f"/api/groups/labels/{label_id}", api_key)
+    async def get_label_by_id(self, label_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get(f"/api/groups/labels/{label_id}", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["label"])
+        return data
 
     async def create_label(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
         return await self.post("/api/groups/labels", api_key, json=payload)
@@ -525,11 +666,17 @@ class MealieClient:
     # Recipe Timeline Events
     # =========================================================================
 
-    async def get_all_timeline_events(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50) -> Any:
-        return await self.get("/api/recipes/timeline/events", api_key, params={"page": page, "perPage": perPage})
+    async def get_all_timeline_events(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/recipes/timeline/events", api_key, params={"page": page, "perPage": perPage})
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["timeline_event"])
+        return data
 
-    async def get_timeline_event_by_id(self, event_id: str, api_key: Optional[str] = None) -> Any:
-        return await self.get(f"/api/recipes/timeline/events/{event_id}", api_key)
+    async def get_timeline_event_by_id(self, event_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get(f"/api/recipes/timeline/events/{event_id}", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["timeline_event"])
+        return data
 
     async def create_timeline_event(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
         if "subject" not in payload:
@@ -556,14 +703,20 @@ class MealieClient:
     # Shared Recipes
     # =========================================================================
 
-    async def get_all_shared_recipes(self, api_key: Optional[str] = None, recipe_id: str = "") -> Any:
+    async def get_all_shared_recipes(self, api_key: Optional[str] = None, recipe_id: str = "", include_all_fields: bool = False) -> Any:
         params = {}
         if recipe_id:
             params["recipeId"] = recipe_id
-        return await self.get("/api/shared/recipes", api_key, params=params or None)
+        data = await self.get("/api/shared/recipes", api_key, params=params or None)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["shared_recipe"])
+        return data
 
-    async def get_shared_recipe_by_id(self, token_id: str, api_key: Optional[str] = None) -> Any:
-        return await self.get(f"/api/recipes/shared/{token_id}", api_key)
+    async def get_shared_recipe_by_id(self, token_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get(f"/api/recipes/shared/{token_id}", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["shared_recipe"])
+        return data
 
     async def create_shared_recipe(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
         return await self.post("/api/shared/recipes", api_key, json=payload)
@@ -575,11 +728,17 @@ class MealieClient:
     # Recipe Actions
     # =========================================================================
 
-    async def get_all_recipe_actions(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50) -> Any:
-        return await self.get("/api/households/recipe-actions", api_key, params={"page": page, "perPage": perPage})
+    async def get_all_recipe_actions(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/households/recipe-actions", api_key, params={"page": page, "perPage": perPage})
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["recipe_action"])
+        return data
 
-    async def get_recipe_action_by_id(self, action_id: str, api_key: Optional[str] = None) -> Any:
-        return await self.get(f"/api/households/recipe-actions/{action_id}", api_key)
+    async def get_recipe_action_by_id(self, action_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get(f"/api/households/recipe-actions/{action_id}", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["recipe_action"])
+        return data
 
     async def create_recipe_action(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
         # API expects: actionType, title, url, name (optional)
@@ -616,11 +775,17 @@ class MealieClient:
     # Event Notifications
     # =========================================================================
 
-    async def get_all_event_notifications(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50) -> Any:
-        return await self.get("/api/households/events/notifications", api_key, params={"page": page, "perPage": perPage})
+    async def get_all_event_notifications(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/households/events/notifications", api_key, params={"page": page, "perPage": perPage})
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["event_notification"])
+        return data
 
-    async def get_event_notification_by_id(self, notifier_id: str, api_key: Optional[str] = None) -> Any:
-        return await self.get(f"/api/households/events/notifications/{notifier_id}", api_key)
+    async def get_event_notification_by_id(self, notifier_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get(f"/api/households/events/notifications/{notifier_id}", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["event_notification"])
+        return data
 
     async def create_event_notification(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
         if "apprise_url" not in payload:
@@ -648,11 +813,17 @@ class MealieClient:
     # Webhooks
     # =========================================================================
 
-    async def get_all_webhooks(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50) -> Any:
-        return await self.get("/api/households/webhooks", api_key, params={"page": page, "perPage": perPage})
+    async def get_all_webhooks(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/households/webhooks", api_key, params={"page": page, "perPage": perPage})
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["webhook"])
+        return data
 
-    async def get_webhook_by_id(self, webhook_id: str, api_key: Optional[str] = None) -> Any:
-        return await self.get(f"/api/households/webhooks/{webhook_id}", api_key)
+    async def get_webhook_by_id(self, webhook_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get(f"/api/households/webhooks/{webhook_id}", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["webhook"])
+        return data
 
     async def create_webhook(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
         if "scheduledTime" not in payload:
@@ -683,8 +854,11 @@ class MealieClient:
     # Invitations
     # =========================================================================
 
-    async def get_all_invitations(self, api_key: Optional[str] = None) -> Any:
-        return await self.get("/api/households/invitations", api_key)
+    async def get_all_invitations(self, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/households/invitations", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["invitation"])
+        return data
 
     async def create_invitation(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
         return await self.post("/api/households/invitations", api_key, json=payload)
@@ -696,17 +870,29 @@ class MealieClient:
     # User Self-Service
     # =========================================================================
 
-    async def get_user_profile(self, api_key: Optional[str] = None) -> Any:
-        return await self.get("/api/users/self", api_key)
+    async def get_user_profile(self, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/users/self", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["user"])
+        return data
 
-    async def get_user_ratings(self, api_key: Optional[str] = None) -> Any:
-        return await self.get("/api/users/self/ratings", api_key)
+    async def get_user_ratings(self, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/users/self/ratings", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["rating"])
+        return data
 
-    async def get_user_rating_for_recipe(self, recipe_id: str, api_key: Optional[str] = None) -> Any:
-        return await self.get(f"/api/users/self/ratings/{recipe_id}", api_key)
+    async def get_user_rating_for_recipe(self, recipe_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get(f"/api/users/self/ratings/{recipe_id}", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["rating"])
+        return data
 
-    async def get_user_favorites(self, api_key: Optional[str] = None) -> Any:
-        return await self.get("/api/users/self/favorites", api_key)
+    async def get_user_favorites(self, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/users/self/favorites", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["recipe"])
+        return data
 
     async def set_recipe_rating(self, user_id: str, slug: str, rating: int, api_key: Optional[str] = None) -> Any:
         return await self.post(f"/api/users/{user_id}/ratings/{slug}", api_key, json={"rating": rating})
@@ -717,24 +903,39 @@ class MealieClient:
     async def remove_recipe_favorite(self, user_id: str, slug: str, api_key: Optional[str] = None) -> Any:
         return await self.delete(f"/api/users/{user_id}/favorites/{slug}", api_key)
 
-    async def get_user_favorites_by_id(self, user_id: str, api_key: Optional[str] = None) -> Any:
-        return await self.get(f"/api/users/{user_id}/favorites", api_key)
+    async def get_user_favorites_by_id(self, user_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get(f"/api/users/{user_id}/favorites", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["recipe"])
+        return data
 
-    async def get_user_ratings_by_id(self, user_id: str, api_key: Optional[str] = None) -> Any:
-        return await self.get(f"/api/users/{user_id}/ratings", api_key)
+    async def get_user_ratings_by_id(self, user_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get(f"/api/users/{user_id}/ratings", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["rating"])
+        return data
 
     # =========================================================================
     # Group / Household Info
     # =========================================================================
 
-    async def get_group_info(self, api_key: Optional[str] = None) -> Any:
-        return await self.get("/api/groups/self", api_key)
+    async def get_group_info(self, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/groups/self", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["group"])
+        return data
 
-    async def list_group_members(self, api_key: Optional[str] = None) -> Any:
-        return await self.get("/api/groups/members", api_key)
+    async def list_group_members(self, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/groups/members", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["member"])
+        return data
 
-    async def get_group_member(self, username_or_id: str, api_key: Optional[str] = None) -> Any:
-        return await self.get(f"/api/groups/members/{username_or_id}", api_key)
+    async def get_group_member(self, username_or_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get(f"/api/groups/members/{username_or_id}", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["member"])
+        return data
 
     async def get_group_preferences(self, api_key: Optional[str] = None) -> Any:
         return await self.get("/api/groups/preferences", api_key)
@@ -745,20 +946,35 @@ class MealieClient:
     async def get_group_storage(self, api_key: Optional[str] = None) -> Any:
         return await self.get("/api/groups/storage", api_key)
 
-    async def list_households(self, api_key: Optional[str] = None) -> Any:
-        return await self.get("/api/groups/households", api_key)
+    async def list_households(self, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/groups/households", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["household"])
+        return data
 
-    async def get_household(self, household_slug: str, api_key: Optional[str] = None) -> Any:
-        return await self.get(f"/api/groups/households/{household_slug}", api_key)
+    async def get_household(self, household_slug: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get(f"/api/groups/households/{household_slug}", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["household"])
+        return data
 
-    async def get_household_info(self, api_key: Optional[str] = None) -> Any:
-        return await self.get("/api/households/self", api_key)
+    async def get_household_info(self, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/households/self", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["household"])
+        return data
 
-    async def get_household_recipe(self, recipe_slug: str, api_key: Optional[str] = None) -> Any:
-        return await self.get(f"/api/households/self/recipes/{recipe_slug}", api_key)
+    async def get_household_recipe(self, recipe_slug: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get(f"/api/households/self/recipes/{recipe_slug}", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["recipe"])
+        return data
 
-    async def list_household_members(self, api_key: Optional[str] = None) -> Any:
-        return await self.get("/api/households/members", api_key)
+    async def list_household_members(self, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/households/members", api_key)
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["member"])
+        return data
 
     async def get_household_preferences(self, api_key: Optional[str] = None) -> Any:
         return await self.get("/api/households/preferences", api_key)
