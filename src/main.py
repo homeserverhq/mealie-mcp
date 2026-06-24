@@ -206,6 +206,28 @@ class UpdateShoppingItemParam(BaseModel):
     unitId: Optional[str] = None
     extras: Optional[dict] = None
 
+class BulkCreateShoppingItem(BaseModel):
+    shoppingListId: str
+    quantity: float = 0
+    note: str = ""
+    display: str = ""
+    checked: bool = False
+    position: int = 0
+    foodId: Optional[str] = None
+    labelId: Optional[str] = None
+    unitId: Optional[str] = None
+
+class BulkUpdateShoppingItem(BaseModel):
+    id: str
+    quantity: Optional[float] = None
+    note: Optional[str] = None
+    display: Optional[str] = None
+    checked: Optional[bool] = None
+    position: Optional[int] = None
+    foodId: Optional[str] = None
+    labelId: Optional[str] = None
+    unitId: Optional[str] = None
+
 class CreateLabelParam(BaseModel):
     name: str
     color: str = ""
@@ -1776,7 +1798,7 @@ async def create_shopping_item(
     """Create a new shopping list item.
     Args:
         shoppingListId: The ID of the shopping list (required).
-        quantity: Item quantity. Defaults to 0.
+        quantity: Item quantity. Renders as leading number when > 0. Defaults to 0.
         note: Note describing the item.
         display: Display text for the item.
         checked: Whether the item is checked off.
@@ -1848,25 +1870,43 @@ async def delete_shopping_item_by_id(
 
 @mcp.tool()
 async def bulk_create_shopping_items(
-    items: list,
+    items: list[BulkCreateShoppingItem],
     ctx: Context = None
 ) -> dict[str, Any]:
     """Bulk create shopping list items.
-    Args:
-        items: List of shopping item objects (required).
+
+    Each item requires `shoppingListId` (UUID of the target list).
+    Optional fields: `quantity` (0), `note` (""), `display` (""),
+    `checked` (false), `position` (0), `foodId`, `labelId`, `unitId`.
+
+    Rendering: Mealie formats each item as "{quantity} {display}".
+    - quantity=0 (default): display text used as-is
+      Example: display="1 pound ground beef" → renders "1 pound ground beef"
+    - quantity>0: leading number prepended
+      Example: quantity=2, display="cups flour" → renders "2 cups flour"
+    If `note` is empty, it falls back to `display`.
     """
-    return await get_client().bulk_create_shopping_items(items, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
+    normalized = []
+    for item in items:
+        entry = item.model_dump(exclude_none=True)
+        if not entry.get("note"):
+            entry["note"] = entry.get("display", "")
+        normalized.append(entry)
+    return await get_client().bulk_create_shopping_items(normalized, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 @mcp.tool()
 async def bulk_update_shopping_items(
-    items: list,
+    items: list[BulkUpdateShoppingItem],
     ctx: Context = None
 ) -> dict[str, Any]:
     """Bulk update shopping list items.
-    Args:
-        items: List of shopping item objects with id fields (required).
+
+    Each item requires `id` (UUID of the item to update).
+    Optional fields: `quantity`, `note`, `display`, `checked`, `position`,
+    `foodId`, `labelId`, `unitId`. Only provided fields are updated.
     """
-    return await get_client().bulk_update_shopping_items(items, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
+    normalized = [item.model_dump(exclude_unset=True, exclude_none=True) for item in items]
+    return await get_client().bulk_update_shopping_items(normalized, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 @mcp.tool()
 async def bulk_delete_shopping_items(
