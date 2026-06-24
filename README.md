@@ -1,32 +1,33 @@
-# Mealie MCP Multitenant Proxy Server
+# Mealie MCP Server
 
 This repository contains a Model Context Protocol (MCP) server that acts
-as a secure, multi-tenant proxy between an AI Assistant and the
-Mealie backend API. It exposes **{N} MCP tools** covering
-{M} resource domains with full CRUD and domain-specific tools.
+as a secure, multi-tenant proxy between an AI Assistant and the Mealie
+backend API. It exposes **161 MCP tools** covering 22 resource domains
+with full CRUD, meal planning, recipe scraping, and bulk operations.
 
 ## ✨ Features
 
 - **🔑 Identity Passthrough** — Extracts the `Authorization: Bearer <token>`
-  header from incoming HTTP requests and forwards it to the Mealie
-  API without server-side authentication.
+  header from incoming HTTP requests and forwards it to the Mealie API
+  without server-side authentication.
 - **👥 Multi-Tenancy** — Uses Python `contextvars` to maintain thread-safe
   user identity isolation, ensuring all AI-driven actions are scoped to
   the authenticated user's permissions.
-- **📊 Full Mealie Coverage** — {N} tools mapped to Mealie
-  API endpoints across {M} resource domains.
+- **📊 Full Mealie Coverage** — 161 tools mapped to Mealie API endpoints
+  across 22 resource domains.
 - **⚡ TOON Optimization** — Bulk list responses are automatically compressed
   using TOON (Token-Optimized Object Notation) to reduce token consumption
   and maximize context window efficiency.
-- **⚡ Efficient Gets** — GET responses return only commonly used fields by
+- **🚀 Efficient Gets** — GET responses return only commonly used fields by
   default. Full objects are available via an `include_all_fields` flag.
-- **🧪 Comprehensive Testing** — {O}+ automated tests covering all tool domains, run via the test runner pipeline.
+- **🧪 Comprehensive Testing** — 186 automated tests covering all tool
+  domains, run via the test runner pipeline.
 
 ## 🔧 Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `MEALIE_BASE_URL` | Yes | Docker-internal URL of the Mealie API |
+| `MEALIE_BASE_URL` | Yes | Docker-internal URL of the Mealie server (e.g. `http://mealie-app:9000`). |
 | `MCP_SERVER_PORT` | Yes | Port number the MCP server listens on |
 | `ALLOW_ALL_AGGREGATE` | No | When `true`, aggregate listing tools honor the `include_all_fields` parameter. When `false` (default), the parameter is silently forced to `False` for aggregate list operations. |
 
@@ -46,6 +47,8 @@ Mealie backend API. It exposes **{N} MCP tools** covering
 
 ## 🐳 Docker Deployment
 
+Build and run the server using Docker:
+
 ```bash
 docker build -t mealie-mcp:latest .
 docker run -d --name mealie-mcp \
@@ -53,19 +56,21 @@ docker run -d --name mealie-mcp \
     -e MCP_SERVER_PORT=6059 \
     mealie-mcp:latest
 
-The MCP server serves at `http://mealie-mcp:6059/mcp`
-(Streamable HTTP).
+The MCP server serves at `http://mealie-mcp:6059/mcp` (Streamable HTTP).
 ```
 
 ## ⚠️ Important Notes
 
 - **📋 `include_all_fields`** — The `include_all_fields` parameter (available
-  on all `get_*` tools) controls whether all available fields
+  on all `get_*` and `list_*` tools) controls whether all available fields
   are included in responses. Defaults to `False` for performance; set to
   `True` only when additional fields are needed.
+- **🔒 `ALLOW_ALL_AGGREGATE`** — Controls whether aggregate listing tools
+  respect the `include_all_fields` parameter. When set to `false` (default),
+  all aggregate list operations silently return only default fields
+  regardless of the caller's request.
 - **⚡ TOON Compression** — All bulk list responses are automatically
-  compressed using TOON (Token-Optimized Object Notation) to reduce token
-  consumption by 30-60%.
+  compressed using TOON to reduce token consumption by 30–60%.
 - **📝 Required Fields & Defaults** — Each `create_*` tool requires specific
   key fields (e.g. `name` for resources). All other fields default to
   empty strings or reasonable values. The owner/user assignment field is
@@ -73,32 +78,36 @@ The MCP server serves at `http://mealie-mcp:6059/mcp`
 
 ## 🛠️ API Tool Mapping
 
-The server implements {N} MCP tools organized into the following
-categories:
+The server implements 161 MCP tools organized into the following categories:
 
-### 📡 Recipes (tools)
-- `get_all_recipes` — List all recipe records
+### 🍲 Recipes (23 tools)
+
+- `get_all_recipes` — List all recipes with pagination and search
 - `get_recipe_by_slug` — Get a single recipe by slug
 - `create_recipe` — Create a new recipe
 - `update_recipe` — Update an existing recipe
 - `delete_recipe_by_slug` — Delete a recipe by slug
 - `duplicate_recipe` — Duplicate a recipe
+- `update_recipe_last_made` — Update the last-made date
+- `bulk_update_recipe_settings` — Bulk update recipe settings
+- `get_recipe_suggestions` — Get recipe suggestions
 - `create_recipe_from_url` — Create a recipe by scraping a URL
 - `create_recipe_from_url_bulk` — Bulk create recipes from URLs
 - `create_recipe_from_html_or_json` — Create from HTML/JSON-LD
 - `test_scrape_url` — Test URL scraping
 - `scrape_recipe_image_url` — Scrape image URL into a recipe
-- `get_recipe_suggestions` — Get recipe suggestions
+- `delete_recipe_image` — Delete a recipe image
+- `get_recipe_export_formats` — List export formats
+- `export_recipe` — Export a single recipe
 - `bulk_tag_recipes` — Bulk assign tags to recipes
 - `bulk_categorize_recipes` — Bulk assign categories
 - `bulk_delete_recipes` — Bulk delete recipes
 - `bulk_export_recipes` — Bulk export recipes
-- `get_recipe_export_formats` — List export formats
-- `export_recipe` — Export a single recipe
 - `list_exports` — List bulk export data files
 - `purge_exports` — Purge all export data
 
-### 🏷️ Categories (7 tools)
+### 📂 Categories (7 tools)
+
 - `get_all_categories` — List all categories
 - `get_category_by_id` — Get category by ID
 - `get_category_by_slug` — Get category by slug
@@ -108,6 +117,7 @@ categories:
 - `delete_category_by_id` — Delete a category
 
 ### 🏷️ Tags (7 tools)
+
 - `get_all_tags` — List all tags
 - `get_tag_by_id` — Get tag by ID
 - `get_tag_by_slug` — Get tag by slug
@@ -117,6 +127,7 @@ categories:
 - `delete_tag_by_id` — Delete a tag
 
 ### 🔧 Tools (6 tools)
+
 - `get_all_tools` — List all tools
 - `get_tool_by_id` — Get tool by ID
 - `get_tool_by_slug` — Get tool by slug
@@ -125,6 +136,7 @@ categories:
 - `delete_tool_by_id` — Delete a tool
 
 ### 🥘 Foods (6 tools)
+
 - `get_all_foods` — List all foods
 - `get_food_by_id` — Get food by ID
 - `create_food` — Create a food
@@ -133,6 +145,7 @@ categories:
 - `merge_foods` — Merge two foods
 
 ### 📐 Units (6 tools)
+
 - `get_all_units` — List all units
 - `get_unit_by_id` — Get unit by ID
 - `create_unit` — Create a unit
@@ -141,20 +154,24 @@ categories:
 - `merge_units` — Merge two units
 
 ### 💬 Comments (5 tools)
+
 - `get_all_comments` — List all comments
 - `get_comment_by_id` — Get comment by ID
 - `create_comment` — Create a comment
 - `update_comment` — Update a comment
 - `delete_comment_by_id` — Delete a comment
 
-### 📚 Cookbooks (6 tools)
+### 📖 Cookbooks (6 tools)
+
 - `get_all_cookbooks` — List all cookbooks
 - `get_cookbook_by_id` — Get cookbook by ID
 - `create_cookbook` — Create a cookbook
 - `update_cookbook` — Update a cookbook
 - `delete_cookbook_by_id` — Delete a cookbook
+- `update_cookbooks` — Bulk update cookbooks
 
 ### 📅 Mealplans (7 tools)
+
 - `get_all_mealplans` — List all mealplans
 - `get_mealplan_by_id` — Get mealplan by ID
 - `get_todays_meals` — Get today's meals
@@ -163,16 +180,27 @@ categories:
 - `update_mealplan` — Update a mealplan
 - `delete_mealplan_by_id` — Delete a mealplan
 
+### ⚙️ Mealplan Rules (5 tools)
+
+- `get_all_mealplan_rules` — List all mealplan rules
+- `get_mealplan_rule_by_id` — Get mealplan rule by ID
+- `create_mealplan_rule` — Create a mealplan rule
+- `update_mealplan_rule` — Update a mealplan rule
+- `delete_mealplan_rule_by_id` — Delete a mealplan rule
+
 ### 🛒 Shopping Lists (8 tools)
+
 - `get_all_shopping_lists` — List all shopping lists
 - `get_shopping_list_by_id` — Get shopping list by ID
 - `create_shopping_list` — Create a shopping list
 - `update_shopping_list` — Update a shopping list
 - `delete_shopping_list_by_id` — Delete a shopping list
+- `update_shopping_list_label_settings` — Update label settings
 - `add_recipe_to_shopping_list` — Add recipe ingredients
 - `remove_recipe_from_shopping_list` — Remove recipe ingredients
 
-### 🛒 Shopping Items (8 tools)
+### 🛍️ Shopping Items (8 tools)
+
 - `get_all_shopping_items` — List all shopping items
 - `get_shopping_item_by_id` — Get shopping item by ID
 - `create_shopping_item` — Create a shopping item
@@ -183,13 +211,15 @@ categories:
 - `bulk_delete_shopping_items` — Bulk delete items
 
 ### 🏷️ Labels (5 tools)
+
 - `get_all_labels` — List all labels
 - `get_label_by_id` — Get label by ID
 - `create_label` — Create a label
 - `update_label` — Update a label
 - `delete_label_by_id` — Delete a label
 
-### 📅 Timeline Events (5 tools)
+### ⏱️ Recipe Timeline Events (5 tools)
+
 - `get_all_timeline_events` — List all timeline events
 - `get_timeline_event_by_id` — Get timeline event by ID
 - `create_timeline_event` — Create a timeline event
@@ -197,12 +227,14 @@ categories:
 - `delete_timeline_event_by_id` — Delete a timeline event
 
 ### 🔗 Shared Recipes (4 tools)
+
 - `get_all_shared_recipes` — List all share tokens
 - `get_shared_recipe_by_id` — Get shared recipe by token
 - `create_shared_recipe` — Create a share token
 - `delete_shared_recipe_by_id` — Delete a share token
 
 ### 🎬 Recipe Actions (6 tools)
+
 - `get_all_recipe_actions` — List all recipe actions
 - `get_recipe_action_by_id` — Get recipe action by ID
 - `create_recipe_action` — Create a recipe action
@@ -211,6 +243,7 @@ categories:
 - `trigger_recipe_action` — Trigger a recipe action
 
 ### 🔔 Event Notifications (6 tools)
+
 - `get_all_event_notifications` — List all notifiers
 - `get_event_notification_by_id` — Get notifier by ID
 - `create_event_notification` — Create a notifier
@@ -219,6 +252,7 @@ categories:
 - `test_event_notification` — Test a notifier
 
 ### 🌐 Webhooks (7 tools)
+
 - `get_all_webhooks` — List all webhooks
 - `get_webhook_by_id` — Get webhook by ID
 - `create_webhook` — Create a webhook
@@ -228,11 +262,13 @@ categories:
 - `rerun_webhooks` — Rerun scheduled webhooks
 
 ### 📧 Invitations (3 tools)
+
 - `get_all_invitations` — List invitation tokens
 - `create_invitation` — Create an invitation token
 - `email_invitation` — Email an invitation
 
-### 👤 User Tools (9 tools)
+### 👤 User Self-Service (7 tools)
+
 - `get_user_profile` — Get own profile
 - `get_user_ratings` — Get own ratings
 - `get_user_rating_for_recipe` — Get rating for recipe
@@ -241,17 +277,32 @@ categories:
 - `add_recipe_favorite` — Add recipe to favorites
 - `remove_recipe_favorite` — Remove recipe from favorites
 
-### 🏠 Group/Household Tools (16 tools)
-- `get_group_info`, `list_group_members`, `get_group_member`
-- `get_group_preferences`, `update_group_preferences`
-- `get_group_storage`
-- `list_households`, `get_household`
-- `get_household_info`, `get_household_recipe`
-- `list_household_members`, `get_household_preferences`
-- `get_household_statistics`
+### 🏠 Group / Household Info (18 tools)
 
-### 🛠️ Utility Tools (7 tools)
+- `get_group_info` — Get group details
+- `list_group_members` — List group members
+- `get_group_member` — Get group member by ID
+- `get_group_preferences` — Get group preferences
+- `update_group_preferences` — Update group preferences
+- `get_group_storage` — Get group storage statistics
+- `list_households` — List all households
+- `get_household` — Get household by ID
+- `get_household_info` — Get household info
+- `get_household_recipe` — Get recipe within household context
+- `list_household_members` — List household members
+- `get_household_preferences` — Get household preferences
+- `update_household_preferences` — Update household preferences
+- `get_household_statistics` — Get household statistics
+- `set_household_permissions` — Set household permissions
+- `get_app_about` — Get app about info
+- `get_app_startup_info` — Get app startup info
+- `get_app_theme` — Get app theme settings
+
+### 🛠️ Domain Utilities (6 tools)
+
 - `parse_ingredient` — Parse an ingredient string
 - `parse_ingredients` — Parse multiple ingredients
+- `seed_default_foods` — Seed default foods
+- `seed_default_labels` — Seed default labels
+- `seed_default_units` — Seed default units
 - `check_server_status` — Check backend connectivity
-- `get_app_about`, `get_app_startup_info`, `get_app_theme`

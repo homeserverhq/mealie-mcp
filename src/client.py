@@ -127,7 +127,7 @@ class MealieClient:
         return await self.get("/api/recipes/exports", api_key)
 
     async def export_recipe(self, slug: str, api_key: Optional[str] = None) -> Any:
-        return await self.get(f"/api/recipes/{slug}/exports", api_key, params={"template_name": "mealie"})
+        return await self.get(f"/api/recipes/{slug}/exports", api_key, params={"template_name": "raw"})
 
     async def bulk_tag_recipes(self, recipes: list[str], tags: list[dict[str, Any]], api_key: Optional[str] = None) -> Any:
         return await self.post("/api/recipes/bulk-actions/tag", api_key, json={"recipes": recipes, "tags": tags})
