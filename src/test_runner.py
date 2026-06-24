@@ -268,7 +268,7 @@ async def scan_for_artifacts(session: MCPSession, match_prefix: str | None = Non
         ("mealplan", "get_all_mealplans", {"page": 1, "perPage": 200}, "id", "title"),
         ("mealplan_rule", "get_all_mealplan_rules", {"page": 1, "perPage": 200}, "id", "day"),
         ("comment", "get_all_comments", {"page": 1, "perPage": 200}, "id", "text"),
-        ("recipe_action", "get_all_recipe_actions", {"page": 1, "perPage": 200}, "id", "name"),
+        ("recipe_action", "get_all_recipe_actions", {"page": 1, "perPage": 200}, "id", "title"),
         ("event_notification", "get_all_event_notifications", {"page": 1, "perPage": 200}, "id", "name"),
         ("webhook", "get_all_webhooks", {"page": 1, "perPage": 200}, "id", "name"),
         ("timeline_event", "get_all_timeline_events", {"page": 1, "perPage": 200}, "id", "id"),
@@ -719,6 +719,7 @@ async def main():
             trigger_action_id = pick_id("trigger_action")
             if trigger_action_id:
                 await run_test(session, "O16b trigger_recipe_action", "trigger_recipe_action", {"id": trigger_action_id, "recipeSlug": main_slug})
+                await run_test(session, "O16c cleanup_trigger_action", "delete_recipe_action_by_id", {"id": trigger_action_id})
 
             # Scrape tools (uses real recipe URL provided by user)
             recipe_url = "https://www.budgetbytes.com/creamy-garlic-chicken/"
