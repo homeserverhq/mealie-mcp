@@ -776,7 +776,6 @@ async def main():
                     {"recipes": [main_slug], "categories": [{"id": cat_id, "name": cat_name, "slug": cat_slug}]})
             await run_test(session, "P3 bulk_update_recipe_settings", "bulk_update_recipe_settings",
                 {"recipes": [main_slug], "settings": {"public": False}})
-            await run_test(session, "P4 bulk_export_recipes", "bulk_export_recipes", {"recipes": [main_slug]})
         if tag_id:
             await run_test(session, "P5 cleanup_bulk_tag", "delete_tag_by_id", {"id": tag_id})
         if cat_id:

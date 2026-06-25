@@ -402,6 +402,59 @@ async def _resolve_label_list(
     return result
 
 
+async def _bulk_patch_recipes(
+    recipes: list,
+    field_name: str,
+    resolved_value: list,
+    token: str
+) -> dict[str, Any]:
+    """Workaround for broken bulk tag/categorize endpoints."""
+    if not recipes:
+        return {"status": "success", "count": 0, "failed": 0}
+
+    success_count = 0
+    failed_count = 0
+    for slug in recipes:
+        try:
+            await get_client().patch_recipe(slug, {field_name: resolved_value}, token)
+            success_count += 1
+        except Exception:
+            failed_count += 1
+
+    return {
+        "status": "success" if failed_count == 0 else "partial",
+        "count": success_count,
+        "failed": failed_count,
+        "total": len(recipes)
+    }
+
+
+async def _bulk_settings_update(
+    recipes: list,
+    settings: dict,
+    token: str
+) -> dict[str, Any]:
+    """Workaround for broken bulk settings endpoint."""
+    if not recipes:
+        return {"status": "success", "count": 0, "failed": 0}
+
+    success_count = 0
+    failed_count = 0
+    for slug in recipes:
+        try:
+            await get_client().patch_recipe(slug, {"settings": settings}, token)
+            success_count += 1
+        except Exception:
+            failed_count += 1
+
+    return {
+        "status": "success" if failed_count == 0 else "partial",
+        "count": success_count,
+        "failed": failed_count,
+        "total": len(recipes)
+    }
+
+
 @mcp.tool()
 async def create_recipe(
     name: str,
@@ -686,12 +739,15 @@ async def bulk_update_recipe_settings(
     settings: dict = {},
     ctx: Context = None
 ) -> dict[str, Any]:
-    """Bulk update settings for multiple recipes.
+    """Bulk update settings for multiple recipes (partial update).
     Args:
         recipes: List of recipe slugs (required).
-        settings: Settings dict to apply to all recipes (required).
+        settings: Settings dict to apply to all recipes. Only included fields are updated (required).
     """
-    return await get_client().bulk_update_recipe_settings(recipes, settings, get_user_token())
+    if not recipes or not settings:
+        return {"status": "error", "message": "recipes and settings are required"}
+
+    return await _bulk_settings_update(recipes, settings, get_user_token())
 
 @mcp.tool()
 async def get_recipe_suggestions(
@@ -809,10 +865,14 @@ async def bulk_tag_recipes(
 ) -> dict[str, Any]:
     """Bulk assign tags to recipes.
     Args:
-        recipes: List of recipe IDs or slugs to tag (required).
-        tags: List of tag objects with id or name (required).
+        recipes: List of recipe slugs to tag (required).
+        tags: List of tag objects with id/name/slug OR tag name strings (required).
     """
-    return await get_client().bulk_tag_recipes(recipes, tags, get_user_token())
+    if not recipes or not tags:
+        return {"status": "error", "message": "recipes and tags are required"}
+
+    resolved = await _resolve_label_list(tags, get_client().get_all_tags, get_client().create_tag, get_user_token())
+    return await _bulk_patch_recipes(recipes, "tags", resolved, get_user_token())
 
 @mcp.tool()
 async def bulk_categorize_recipes(
@@ -822,10 +882,14 @@ async def bulk_categorize_recipes(
 ) -> dict[str, Any]:
     """Bulk assign categories to recipes.
     Args:
-        recipes: List of recipe IDs or slugs to categorize (required).
-        categories: List of category objects with id or name (required).
+        recipes: List of recipe slugs to categorize (required).
+        categories: List of category objects with id/name/slug OR category name strings (required).
     """
-    return await get_client().bulk_categorize_recipes(recipes, categories, get_user_token())
+    if not recipes or not categories:
+        return {"status": "error", "message": "recipes and categories are required"}
+
+    resolved = await _resolve_label_list(categories, get_client().get_all_categories, get_client().create_category, get_user_token())
+    return await _bulk_patch_recipes(recipes, "recipeCategory", resolved, get_user_token())
 
 @mcp.tool()
 async def bulk_delete_recipes(
@@ -838,18 +902,6 @@ async def bulk_delete_recipes(
     """
     await get_client().bulk_delete_recipes(recipes, get_user_token())
     return {"status": "deleted", "count": len(recipes)}
-
-@mcp.tool()
-async def bulk_export_recipes(
-    recipes: list,
-    ctx: Context = None
-) -> dict[str, Any]:
-    """Bulk export recipes.
-    Args:
-        recipes: List of recipe slugs to export (required).
-    """
-    result = await get_client().bulk_export_recipes(recipes, get_user_token())
-    return {"status": "exported", "result": result}
 
 @mcp.tool()
 async def list_exports(
