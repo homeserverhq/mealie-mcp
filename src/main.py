@@ -386,6 +386,9 @@ async def get_all_recipes(
         page=page, perPage=perPage, search=search, cookbook=cookbook,
         include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False
     )
+    if isinstance(data, dict) and "items" in data:
+        public_hostname = get_client().public_hostname
+        data["items"] = [_add_recipe_urls(item, public_hostname) for item in data["items"]]
     return {"items": json_to_toon(data)}
 
 @mcp.tool()
@@ -399,7 +402,8 @@ async def get_recipe_by_slug(
         slug: The unique slug of the recipe (required).
         include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
     """
-    return await get_client().get_recipe_by_slug(slug, get_user_token(), include_all_fields=include_all_fields)
+    result = await get_client().get_recipe_by_slug(slug, get_user_token(), include_all_fields=include_all_fields)
+    return _add_recipe_urls(result, get_client().public_hostname)
 
 
 def _format_ingredient(i) -> dict:
@@ -446,6 +450,27 @@ async def _resolve_labels_by_slug(
             created = await create_func({"name": item.name, "slug": item.slug}, token)
             result.append({"id": created["id"], "name": created["name"], "slug": created["slug"]})
 
+    return result
+
+
+def _add_recipe_urls(recipe: dict, public_hostname: str) -> dict:
+    """Add recipeUrl and recipeImgUrl to recipe response."""
+    if not isinstance(recipe, dict):
+        return recipe
+
+    slug = recipe.get("slug", "")
+    recipe_id = recipe.get("id", "")
+    image = recipe.get("image", "")
+
+    recipe_url = f"{public_hostname}/g/home/r/{slug}" if slug else None
+
+    recipe_img_url = None
+    if image and recipe_id:
+        recipe_img_url = f"{public_hostname}/api/media/recipes/{recipe_id}/images/original.webp?rnd=1&version={image}"
+
+    result = {**recipe, "recipeUrl": recipe_url}
+    if recipe_img_url:
+        result["recipeImgUrl"] = recipe_img_url
     return result
 
 
@@ -649,7 +674,7 @@ async def create_recipe(
         result = await get_client().get_recipe_by_slug(slug, token, include_all_fields=ALLOW_ALL_AGGREGATE)
 
     if isinstance(result, dict):
-        return {"slug": result.get("slug", slug), "id": result.get("id", ""), "status": "created"}
+        return _add_recipe_urls(result, get_client().public_hostname)
     return {"slug": slug, "status": "created"}
 
 @mcp.tool()
@@ -768,6 +793,8 @@ async def update_recipe(
     if _update_tags is not None or _update_recipeCategory is not None or _update_tools is not None:
         result = await get_client().get_recipe_by_slug(slug, token, include_all_fields=ALLOW_ALL_AGGREGATE)
 
+    if isinstance(result, dict):
+        return _add_recipe_urls(result, get_client().public_hostname)
     return result
 
 @mcp.tool()

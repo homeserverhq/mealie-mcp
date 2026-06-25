@@ -22,7 +22,7 @@ def _normalize_payload(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 COMMON_FIELDS: dict[str, set[str]] = {
-    "recipe": {"id", "name", "slug", "totalTime", "recipeCategory", "rating", "tags", "recipeServings"},
+    "recipe": {"id", "name", "slug", "image", "totalTime", "recipeCategory", "rating", "tags", "recipeServings"},
     "category": {"id", "name", "slug"},
     "tag": {"id", "name", "slug"},
     "tool": {"id", "name", "slug"},
@@ -86,12 +86,26 @@ class MealieClient:
             headers["Authorization"] = f"Bearer {api_key}"
         return headers
 
+    URL_REWRITE_FIELDS = {"image"}
+    EXTERNAL_URL_FIELDS = {"orgURL", "url", "appriseUrl", "recipeUrl", "recipeImgUrl"}
+
     def _replace_base_urls(self, data: Any) -> Any:
-        """Replace internal hostname with public hostname in all URL strings."""
+        """Replace internal hostname with public hostname in specific URL fields only."""
         if isinstance(data, dict):
-            return {k: self._replace_base_urls(v) for k, v in data.items()}
+            result = {}
+            for k, v in data.items():
+                if k in self.EXTERNAL_URL_FIELDS:
+                    result[k] = v
+                elif k in self.URL_REWRITE_FIELDS and isinstance(v, str) and "://" in v:
+                    result[k] = self._rewrite_url(v)
+                else:
+                    result[k] = self._replace_base_urls(v)
+            return result
         if isinstance(data, list):
             return [self._replace_base_urls(item) for item in data]
+        return data
+
+    def _rewrite_url(self, data: Any) -> Any:
         if isinstance(data, str) and "://" in data:
             return re.sub(r'://[^/]+', f'://{self.public_hostname}', data)
         return data
