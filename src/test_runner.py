@@ -768,12 +768,12 @@ async def main():
         cat_name = cat_data.get("name") if isinstance(cat_data, dict) else None
         cat_slug = cat_data.get("slug") if isinstance(cat_data, dict) else None
         if main_slug:
-            if tag_id and tag_name and tag_slug:
+            if tag_name and tag_slug:
                 await run_test(session, "P1 bulk_tag_recipes", "bulk_tag_recipes",
-                    {"recipes": [main_slug], "tags": [{"id": tag_id, "name": tag_name, "slug": tag_slug}]})
-            if cat_id and cat_name and cat_slug:
+                    {"recipes": [main_slug], "tags": [{"name": tag_name, "slug": tag_slug}]})
+            if cat_name and cat_slug:
                 await run_test(session, "P2 bulk_categorize_recipes", "bulk_categorize_recipes",
-                    {"recipes": [main_slug], "categories": [{"id": cat_id, "name": cat_name, "slug": cat_slug}]})
+                    {"recipes": [main_slug], "categories": [{"name": cat_name, "slug": cat_slug}]})
             await run_test(session, "P3 bulk_update_recipe_settings", "bulk_update_recipe_settings",
                 {"recipes": [main_slug], "settings": {"public": False}})
         if tag_id:

@@ -84,6 +84,25 @@ class CreateRecipeParam(BaseModel):
     extras: dict = {}
     image: str = ""
 
+class TagObjectInput(BaseModel):
+    """Tag object for bulk tag operations. Slug is used to find existing tags; if not found, a new tag is created with the given name and slug. Duplicate slugs in the same request are collapsed."""
+    name: str
+    slug: str
+
+class CategoryObjectInput(BaseModel):
+    """Category object for bulk categorize operations. Slug is used to find existing categories; if not found, a new category is created with the given name and slug. Duplicate slugs in the same request are collapsed."""
+    name: str
+    slug: str
+
+class BulkRecipeSettingsInput(BaseModel):
+    """Settings fields for bulk update. All fields optional — only provided fields are updated on each recipe."""
+    public: Optional[bool] = None
+    show_nutrition: Optional[bool] = None
+    show_assets: Optional[bool] = None
+    landscape_view: Optional[bool] = None
+    disable_comments: Optional[bool] = None
+    locked: Optional[bool] = None
+
 class UpdateRecipeParam(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
@@ -376,6 +395,39 @@ def _format_ingredient(i) -> dict:
         ing.setdefault("note", ing.get("display", ""))
         return ing
     return {"display": str(i), "note": str(i), "quantity": 0, "referenceId": str(uuid.uuid4())}
+
+
+async def _resolve_labels_by_slug(
+    items: list,
+    fetch_func,
+    create_func,
+    token: str
+) -> list[dict]:
+    """Resolve label objects by slug. Returns list of {id, name, slug} dicts.
+    Duplicates are collapsed — same slug = same object."""
+    if not items:
+        return []
+
+    # Deduplicate by slug first
+    unique_items: dict[str, Any] = {}
+    for item in items:
+        key = item.slug.lower()
+        if key not in unique_items:
+            unique_items[key] = item
+
+    all_items = await fetch_func(token, page=1, perPage=500)
+    items_list = all_items.get("items", [])
+
+    result = []
+    for item in unique_items.values():
+        found = next((x for x in items_list if x.get("slug", "").lower() == item.slug.lower()), None)
+        if found:
+            result.append({"id": found["id"], "name": found["name"], "slug": found["slug"]})
+        else:
+            created = await create_func({"name": item.name, "slug": item.slug}, token)
+            result.append({"id": created["id"], "name": created["name"], "slug": created["slug"]})
+
+    return result
 
 
 async def _resolve_label_list(
@@ -735,19 +787,23 @@ async def update_recipe_last_made(
 
 @mcp.tool()
 async def bulk_update_recipe_settings(
-    recipes: list,
-    settings: dict = {},
+    recipes: list[str],
+    settings: BulkRecipeSettingsInput,
     ctx: Context = None
 ) -> dict[str, Any]:
     """Bulk update settings for multiple recipes (partial update).
     Args:
         recipes: List of recipe slugs (required).
-        settings: Settings dict to apply to all recipes. Only included fields are updated (required).
+        settings: Settings object with any subset of: public, show_nutrition, show_assets, landscape_view, disable_comments, locked. Only provided fields are updated on each recipe.
     """
     if not recipes or not settings:
         return {"status": "error", "message": "recipes and settings are required"}
 
-    return await _bulk_settings_update(recipes, settings, get_user_token())
+    settings_dict = settings.model_dump(exclude_none=True)
+    if not settings_dict:
+        return {"status": "error", "message": "at least one settings field must be provided"}
+
+    return await _bulk_settings_update(recipes, settings_dict, get_user_token())
 
 @mcp.tool()
 async def get_recipe_suggestions(
@@ -859,36 +915,36 @@ async def export_recipe(
 
 @mcp.tool()
 async def bulk_tag_recipes(
-    recipes: list,
-    tags: list,
+    recipes: list[str],
+    tags: list[TagObjectInput],
     ctx: Context = None
 ) -> dict[str, Any]:
     """Bulk assign tags to recipes.
     Args:
         recipes: List of recipe slugs to tag (required).
-        tags: List of tag objects with id/name/slug OR tag name strings (required).
+        tags: List of TagObjectInput with name and slug. Slug is used to find existing tags; if not found, a new tag is created. Duplicate slugs are collapsed.
     """
     if not recipes or not tags:
         return {"status": "error", "message": "recipes and tags are required"}
 
-    resolved = await _resolve_label_list(tags, get_client().get_all_tags, get_client().create_tag, get_user_token())
+    resolved = await _resolve_labels_by_slug(tags, get_client().get_all_tags, get_client().create_tag, get_user_token())
     return await _bulk_patch_recipes(recipes, "tags", resolved, get_user_token())
 
 @mcp.tool()
 async def bulk_categorize_recipes(
-    recipes: list,
-    categories: list,
+    recipes: list[str],
+    categories: list[CategoryObjectInput],
     ctx: Context = None
 ) -> dict[str, Any]:
     """Bulk assign categories to recipes.
     Args:
         recipes: List of recipe slugs to categorize (required).
-        categories: List of category objects with id/name/slug OR category name strings (required).
+        categories: List of CategoryObjectInput with name and slug. Slug is used to find existing categories; if not found, a new category is created. Duplicate slugs are collapsed.
     """
     if not recipes or not categories:
         return {"status": "error", "message": "recipes and categories are required"}
 
-    resolved = await _resolve_label_list(categories, get_client().get_all_categories, get_client().create_category, get_user_token())
+    resolved = await _resolve_labels_by_slug(categories, get_client().get_all_categories, get_client().create_category, get_user_token())
     return await _bulk_patch_recipes(recipes, "recipeCategory", resolved, get_user_token())
 
 @mcp.tool()
