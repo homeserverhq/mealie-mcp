@@ -177,6 +177,14 @@ class UpdateCookbookParam(BaseModel):
     public: Optional[bool] = None
     queryFilterString: Optional[str] = None
 
+class CookbookUpdateItemParam(BaseModel):
+    id: str
+    name: Optional[str] = None
+    description: Optional[str] = None
+    position: Optional[int] = None
+    public: Optional[bool] = None
+    queryFilterString: Optional[str] = None
+
 class CreateMealplanParam(BaseModel):
     date: str
     entryType: str = "dinner"
@@ -301,6 +309,10 @@ class UpdateWebhookParam(BaseModel):
     url: Optional[str] = None
     enabled: Optional[bool] = None
 
+def _str_or_pass(v):
+    return str(v) if isinstance(v, int) else v
+
+
 def _normalize_enum(value: str, valid: set[str], param_name: str) -> str:
     if not value:
         return value
@@ -395,10 +407,10 @@ async def create_recipe(
     name: str,
     description: str = "",
     recipeServings: float = 0,
-    totalTime: str = "",
-    prepTime: str = "",
-    cookTime: str = "",
-    performTime: str = "",
+    totalTime: str | int = "",
+    prepTime: str | int = "",
+    cookTime: str | int = "",
+    performTime: str | int = "",
     recipeYield: str = "",
     recipeYieldQuantity: float = 0,
     orgURL: str = "",
@@ -419,10 +431,10 @@ async def create_recipe(
         name: Name of the recipe (required).
         description: Description of the recipe.
         recipeServings: Number of servings.
-        totalTime: Total cooking time (e.g. "30 minutes").
-        prepTime: Preparation time.
-        cookTime: Cooking time.
-        performTime: Active/performance time.
+        totalTime: Total cooking time (e.g. "45 minutes", "1 hour 30 minutes").
+        prepTime: Preparation time (e.g. "15 minutes").
+        cookTime: Cooking time (e.g. "30 minutes").
+        performTime: Active/performance time (e.g. "20 minutes").
         recipeYield: Yield amount text.
         recipeYieldQuantity: Yield quantity number.
         orgURL: Original URL the recipe was sourced from.
@@ -437,6 +449,10 @@ async def create_recipe(
         extras: Custom key-value pairs for extended data.
         image: Image URL to scrape.
     """
+    totalTime = _str_or_pass(totalTime)
+    prepTime = _str_or_pass(prepTime)
+    cookTime = _str_or_pass(cookTime)
+    performTime = _str_or_pass(performTime)
     slug_raw = await get_client().create_recipe({"name": name}, get_user_token())
     slug = slug_raw if isinstance(slug_raw, str) else slug_raw.get("slug", "")
     if not slug:
@@ -518,10 +534,10 @@ async def update_recipe(
     name: str = None,
     description: str = None,
     recipeServings: float = None,
-    totalTime: str = None,
-    prepTime: str = None,
-    cookTime: str = None,
-    performTime: str = None,
+    totalTime: str | int = None,
+    prepTime: str | int = None,
+    cookTime: str | int = None,
+    performTime: str | int = None,
     recipeYield: str = None,
     recipeYieldQuantity: float = None,
     orgURL: str = None,
@@ -543,10 +559,10 @@ async def update_recipe(
         name: Name of the recipe.
         description: Description of the recipe.
         recipeServings: Number of servings.
-        totalTime: Total cooking time.
-        prepTime: Preparation time.
-        cookTime: Cooking time.
-        performTime: Active/performance time.
+        totalTime: Total cooking time (e.g. "45 minutes", "1 hour 30 minutes").
+        prepTime: Preparation time (e.g. "15 minutes").
+        cookTime: Cooking time (e.g. "30 minutes").
+        performTime: Active/performance time (e.g. "20 minutes").
         recipeYield: Yield amount text.
         recipeYieldQuantity: Yield quantity number.
         orgURL: Original URL the recipe was sourced from.
@@ -561,6 +577,10 @@ async def update_recipe(
         extras: Custom key-value pairs.
         image: Image URL to scrape.
     """
+    totalTime = _str_or_pass(totalTime)
+    prepTime = _str_or_pass(prepTime)
+    cookTime = _str_or_pass(cookTime)
+    performTime = _str_or_pass(performTime)
     recipe = await get_client().get_recipe_by_slug(slug, get_user_token(), include_all_fields=True)
     if not isinstance(recipe, dict):
         return {"slug": slug, "status": "not_found"}
@@ -1568,14 +1588,15 @@ async def delete_cookbook_by_id(
 
 @mcp.tool()
 async def update_cookbooks(
-    cookbooks: list,
+    cookbooks: list[CookbookUpdateItemParam],
     ctx: Context = None
 ) -> dict[str, Any]:
     """Bulk reorder or update cookbooks.
     Args:
-        cookbooks: List of cookbook objects. Each object must have an "id" field (cookbook UUID). Optional fields: name (str), description (str), position (int), public (bool), queryFilterString (str).
+        cookbooks: List of cookbook update objects. Each must have an "id" field (cookbook UUID). Optional fields: name, description, position, public, queryFilterString.
     """
-    return await get_client().update_cookbooks(cookbooks, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
+    payload = [c.model_dump(exclude_none=True) for c in cookbooks]
+    return await get_client().update_cookbooks(payload, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 # =============================================================================
 # Mealplans
