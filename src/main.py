@@ -103,6 +103,25 @@ class BulkRecipeSettingsInput(BaseModel):
     disable_comments: Optional[bool] = None
     locked: Optional[bool] = None
 
+class ToolObjectInput(BaseModel):
+    """Tool object for recipe operations. Slug is used to find existing tools; if not found, a new tool is created with the given name and slug. Duplicate slugs in the same request are collapsed."""
+    name: str
+    slug: str
+
+class NutritionInput(BaseModel):
+    """Nutrition information for a recipe. All fields optional."""
+    calories: Optional[str] = None
+    carbohydrateContent: Optional[str] = None
+    cholesterolContent: Optional[str] = None
+    fatContent: Optional[str] = None
+    fiberContent: Optional[str] = None
+    proteinContent: Optional[str] = None
+    saturatedFatContent: Optional[str] = None
+    sodiumContent: Optional[str] = None
+    sugarContent: Optional[str] = None
+    transFatContent: Optional[str] = None
+    unsaturatedFatContent: Optional[str] = None
+
 class UpdateRecipeParam(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
@@ -519,12 +538,12 @@ async def create_recipe(
     recipeYield: str = "",
     recipeYieldQuantity: float = 0,
     orgURL: str = "",
-    recipeCategory: list = [],
-    tags: list = [],
-    tools: list = [],
+    recipeCategory: list[CategoryObjectInput] = [],
+    tags: list[TagObjectInput] = [],
+    tools: list[ToolObjectInput] = [],
     recipeIngredient: list = [],
     recipeInstructions: list[RecipeInstructionParam] = [],
-    nutrition: dict = {},
+    nutrition: Optional[NutritionInput] = None,
     settings: dict = {},
     notes: list = [],
     extras: dict = {},
@@ -543,15 +562,15 @@ async def create_recipe(
         recipeYield: Yield amount text.
         recipeYieldQuantity: Yield quantity number.
         orgURL: Original URL the recipe was sourced from.
-        recipeCategory: List of category IDs or names.
-        tags: List of tag IDs or names.
-        tools: List of tool IDs or names.
+        recipeCategory: List of CategoryObjectInput with name and slug. Slug is used to find existing categories; if not found, a new category is created.
+        tags: List of TagObjectInput with name and slug. Slug is used to find existing tags; if not found, a new tag is created.
+        tools: List of ToolObjectInput with name and slug. Slug is used to find existing tools; if not found, a new tool is created.
         recipeIngredient: List of ingredient strings ("3 cups flour") or ingredient objects (display, quantity, note).
         recipeInstructions: List of instruction objects (text, title, summary).
-        nutrition: Nutrition information object. Known keys: calories, carbohydrateContent, cholesterolContent, fatContent, fiberContent, proteinContent, saturatedFatContent, sodiumContent, sugarContent, transFatContent, unsaturatedFatContent.
+        nutrition: NutritionInput object with optional fields: calories, carbohydrateContent, cholesterolContent, fatContent, fiberContent, proteinContent, saturatedFatContent, sodiumContent, sugarContent, transFatContent, unsaturatedFatContent.
         settings: Recipe settings object. Known keys: public (bool), showNutrition (bool), showAssets (bool), landscapeView (bool), disableComments (bool), locked (bool).
         notes: List of note objects with keys: title (str), text (str).
-        extras: Custom key-value pairs for extended data.
+        extras: Custom key-value pairs (string keys and string values) for extended data.
         image: Image URL to scrape.
     """
     totalTime = _str_or_pass(totalTime)
@@ -584,7 +603,7 @@ async def create_recipe(
         "recipeCategory": [],
         "tags": [],
         "tools": [],
-        "nutrition": nutrition,
+        "nutrition": nutrition.model_dump(exclude_none=True) if nutrition else {},
         "settings": settings,
         "notes": notes,
         "extras": extras,
@@ -609,19 +628,19 @@ async def create_recipe(
     token = get_user_token()
     if _orig_tags:
         try:
-            resolved = await _resolve_label_list(_orig_tags, get_client().get_all_tags, get_client().create_tag, token)
+            resolved = await _resolve_labels_by_slug(_orig_tags, get_client().get_all_tags, get_client().create_tag, token)
             await get_client().patch_recipe(slug, {"tags": resolved}, token)
         except Exception:
             pass
     if _orig_recipeCategory:
         try:
-            resolved = await _resolve_label_list(_orig_recipeCategory, get_client().get_all_categories, get_client().create_category, token)
+            resolved = await _resolve_labels_by_slug(_orig_recipeCategory, get_client().get_all_categories, get_client().create_category, token)
             await get_client().patch_recipe(slug, {"recipeCategory": resolved}, token)
         except Exception:
             pass
     if _orig_tools:
         try:
-            resolved = await _resolve_label_list(_orig_tools, get_client().get_all_tools, get_client().create_tool, token)
+            resolved = await _resolve_labels_by_slug(_orig_tools, get_client().get_all_tools, get_client().create_tool, token)
             await get_client().patch_recipe(slug, {"tools": resolved}, token)
         except Exception:
             pass
@@ -646,12 +665,12 @@ async def update_recipe(
     recipeYield: str = None,
     recipeYieldQuantity: float = None,
     orgURL: str = None,
-    recipeCategory: list = None,
-    tags: list = None,
-    tools: list = None,
+    recipeCategory: list[CategoryObjectInput] | None = None,
+    tags: list[TagObjectInput] | None = None,
+    tools: list[ToolObjectInput] | None = None,
     recipeIngredient: list = None,
     recipeInstructions: list[RecipeInstructionParam] = None,
-    nutrition: dict = None,
+    nutrition: Optional[NutritionInput] = None,
     settings: dict = None,
     notes: list = None,
     extras: dict = None,
@@ -671,15 +690,15 @@ async def update_recipe(
         recipeYield: Yield amount text.
         recipeYieldQuantity: Yield quantity number.
         orgURL: Original URL the recipe was sourced from.
-        recipeCategory: List of category IDs or names.
-        tags: List of tag IDs or names.
-        tools: List of tool IDs or names.
+        recipeCategory: List of CategoryObjectInput with name and slug. Slug is used to find existing categories; if not found, a new category is created.
+        tags: List of TagObjectInput with name and slug. Slug is used to find existing tags; if not found, a new tag is created.
+        tools: List of ToolObjectInput with name and slug. Slug is used to find existing tools; if not found, a new tool is created.
         recipeIngredient: List of ingredient strings ("3 cups flour") or ingredient objects (display, quantity, note).
         recipeInstructions: List of instruction objects (text, title, summary).
-        nutrition: Nutrition information object. Known keys: calories, carbohydrateContent, cholesterolContent, fatContent, fiberContent, proteinContent, saturatedFatContent, sodiumContent, sugarContent, transFatContent, unsaturatedFatContent.
+        nutrition: NutritionInput object with optional fields: calories, carbohydrateContent, cholesterolContent, fatContent, fiberContent, proteinContent, saturatedFatContent, sodiumContent, sugarContent, transFatContent, unsaturatedFatContent.
         settings: Recipe settings object. Known keys: public (bool), showNutrition (bool), showAssets (bool), landscapeView (bool), disableComments (bool), locked (bool).
         notes: List of note objects with keys: title (str), text (str).
-        extras: Custom key-value pairs.
+        extras: Custom key-value pairs (string keys and string values).
         image: Image URL to scrape.
     """
     totalTime = _str_or_pass(totalTime)
@@ -699,7 +718,7 @@ async def update_recipe(
         "totalTime": totalTime, "prepTime": prepTime, "cookTime": cookTime,
         "performTime": performTime, "recipeYield": recipeYield,
         "recipeYieldQuantity": recipeYieldQuantity, "orgURL": orgURL,
-        "nutrition": nutrition, "settings": settings, "notes": notes,
+        "nutrition": nutrition.model_dump(exclude_none=True) if nutrition else None, "settings": settings, "notes": notes,
         "extras": extras, "image": image,
     }
     recipe.update({k: v for k, v in scalar_fields.items() if v is not None})
@@ -729,19 +748,19 @@ async def update_recipe(
     token = get_user_token()
     if _update_tags is not None:
         try:
-            resolved = await _resolve_label_list(_update_tags, get_client().get_all_tags, get_client().create_tag, token)
+            resolved = await _resolve_labels_by_slug(_update_tags, get_client().get_all_tags, get_client().create_tag, token)
             await get_client().patch_recipe(slug, {"tags": resolved}, token)
         except Exception:
             pass
     if _update_recipeCategory is not None:
         try:
-            resolved = await _resolve_label_list(_update_recipeCategory, get_client().get_all_categories, get_client().create_category, token)
+            resolved = await _resolve_labels_by_slug(_update_recipeCategory, get_client().get_all_categories, get_client().create_category, token)
             await get_client().patch_recipe(slug, {"recipeCategory": resolved}, token)
         except Exception:
             pass
     if _update_tools is not None:
         try:
-            resolved = await _resolve_label_list(_update_tools, get_client().get_all_tools, get_client().create_tool, token)
+            resolved = await _resolve_labels_by_slug(_update_tools, get_client().get_all_tools, get_client().create_tool, token)
             await get_client().patch_recipe(slug, {"tools": resolved}, token)
         except Exception:
             pass
@@ -835,7 +854,7 @@ async def create_recipe_from_url(
 
 @mcp.tool()
 async def create_recipe_from_url_bulk(
-    urls: list,
+    urls: list[str],
     ctx: Context = None
 ) -> dict[str, Any]:
     """Bulk create recipes by scraping multiple URLs.
@@ -949,7 +968,7 @@ async def bulk_categorize_recipes(
 
 @mcp.tool()
 async def bulk_delete_recipes(
-    recipes: list,
+    recipes: list[str],
     ctx: Context = None
 ) -> dict[str, Any]:
     """Bulk delete recipes.
@@ -1313,7 +1332,7 @@ async def create_food(
     name: str,
     description: str = "",
     pluralName: str = "",
-    aliases: list = [],
+    aliases: list[str] = [],
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a new ingredient food.
@@ -1337,7 +1356,7 @@ async def update_food(
     name: str = None,
     description: str = None,
     pluralName: str = None,
-    aliases: list = None,
+    aliases: list[str] | None = None,
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update an existing food.
@@ -1426,7 +1445,7 @@ async def create_unit(
     description: str = "",
     fraction: bool = False,
     useAbbreviation: bool = False,
-    aliases: list = [],
+    aliases: list[str] = [],
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a new ingredient unit.
@@ -1460,7 +1479,7 @@ async def update_unit(
     description: str = None,
     fraction: bool = None,
     useAbbreviation: bool = None,
-    aliases: list = None,
+    aliases: list[str] | None = None,
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update an existing unit.
@@ -2230,7 +2249,7 @@ async def bulk_update_shopping_items(
 
 @mcp.tool()
 async def bulk_delete_shopping_items(
-    ids: list,
+    ids: list[str],
     ctx: Context = None
 ) -> dict[str, Any]:
     """Bulk delete shopping list items by IDs.
@@ -3106,7 +3125,7 @@ async def parse_ingredient(
 
 @mcp.tool()
 async def parse_ingredients(
-    ingredients: list,
+    ingredients: list[str],
     ctx: Context = None
 ) -> dict[str, Any]:
     """Parse multiple ingredient strings into structured data.

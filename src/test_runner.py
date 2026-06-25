@@ -994,7 +994,10 @@ async def main():
             {"text": "Garnish with fresh parsley and serve immediately.", "title": "Garnish and Serve"},
         ]
 
-        CATEGORY_TEST_DATA = ["Main Course", "Low Carb"]
+        CATEGORY_TEST_DATA = [
+            {"name": "Main Course", "slug": "main-course"},
+            {"name": "Low Carb", "slug": "low-carb"}
+        ]
 
         await run_test_with_store(
             session, "AA1 create_recipe_with_ingredients", "create_recipe",
@@ -1102,9 +1105,9 @@ async def main():
                     "description": "Updated ingredient/instruction test",
                     "recipeIngredient": UPDATED_INGREDIENTS,
                     "recipeInstructions": UPDATED_INSTRUCTIONS,
-                    "tags": ["Cajun"],
-                    "recipeCategory": ["Main Course"],
-                    "tools": ["Oven"],
+                    "tags": [{"name": "Cajun", "slug": "cajun"}],
+                    "recipeCategory": [{"name": "Main Course", "slug": "main-course"}],
+                    "tools": [{"name": "Oven", "slug": "oven"}],
                 },
                 store_key="ingredient_recipe_updated"
             )
