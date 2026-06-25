@@ -2,6 +2,7 @@ import os
 import re
 import datetime as dt
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 import httpx
 
@@ -76,12 +77,24 @@ class MealieClient:
                 "Mealie URL required. Set MEALIE_BASE_URL env var "
                 "or pass base_url."
             )
+        self.public_url = os.getenv("MEALIE_PUBLIC_URL", "").rstrip("/") or self.base_url
+        self.public_hostname = urlparse(self.public_url).netloc or urlparse(self.public_url).hostname or self.public_url
 
     def _get_headers(self, api_key: Optional[str] = None) -> dict[str, str]:
         headers = {"Content-Type": "application/json"}
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
         return headers
+
+    def _replace_base_urls(self, data: Any) -> Any:
+        """Replace internal hostname with public hostname in all URL strings."""
+        if isinstance(data, dict):
+            return {k: self._replace_base_urls(v) for k, v in data.items()}
+        if isinstance(data, list):
+            return [self._replace_base_urls(item) for item in data]
+        if isinstance(data, str) and "://" in data:
+            return re.sub(r'://[^/]+', f'://{self.public_hostname}', data)
+        return data
 
     async def request(self, method: str, path: str, api_key: Optional[str] = None, **kwargs: Any) -> Any:
         url = f"{self.base_url}{path}"
@@ -93,7 +106,8 @@ class MealieClient:
                 return {}
             if response.headers.get("content-type", "").startswith("application/json"):
                 data = response.json()
-                return _strip_nulls(data, strip_empty=False) if data is not None else {}
+                data = _strip_nulls(data, strip_empty=False) if data is not None else {}
+                return self._replace_base_urls(data)
             return {"text": response.text}
 
     async def get(self, path: str, api_key: Optional[str] = None, **kwargs: Any) -> Any:
