@@ -788,7 +788,27 @@ async def main():
         log("\n=== Phase 9: Shopping List Operations ===")
         slist_id = item_list_id or pick_id("create_shoppinglist")
         if slist_id:
-            await run_test(session, "Q1 update_shopping_list_label_settings", "update_shopping_list_label_settings", {"id": slist_id})
+            q1_label_id = ""
+            try:
+                _r = await session.call_tool("get_all_labels", {"perPage": 50})
+                _d = extract_content(_r)
+                _items = get_list_items(_d)
+                if _items:
+                    q1_label_id = _items[0]["id"]
+            except Exception:
+                pass
+            if not q1_label_id:
+                try:
+                    _r = await session.call_tool("create_label", {"name": f"test-label-q1-{rid}"})
+                    _d = extract_content(_r)
+                    if isinstance(_d, dict):
+                        q1_label_id = _d.get("id", "")
+                except Exception:
+                    pass
+            if q1_label_id:
+                await run_test(session, "Q1 update_shopping_list_label_settings", "update_shopping_list_label_settings", {"id": slist_id, "labelId": q1_label_id})
+            else:
+                log(f"  SKIP Q1: no label available")
 
         # Bulk shopping items
         if slist_id:

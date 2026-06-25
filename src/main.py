@@ -301,6 +301,15 @@ class UpdateWebhookParam(BaseModel):
     url: Optional[str] = None
     enabled: Optional[bool] = None
 
+def _normalize_enum(value: str, valid: set[str], param_name: str) -> str:
+    if not value:
+        return value
+    for v in valid:
+        if v.lower() == value.lower():
+            return v
+    raise ValueError(f"Invalid {param_name}: {value!r}. Must be one of: {', '.join(sorted(valid))}")
+
+
 # =============================================================================
 # Recipes
 # =============================================================================
@@ -422,9 +431,9 @@ async def create_recipe(
         tools: List of tool IDs or names.
         recipeIngredient: List of ingredient strings ("3 cups flour") or ingredient objects (display, quantity, note).
         recipeInstructions: List of instruction objects (text, title, summary).
-        nutrition: Nutrition information object.
-        settings: Recipe settings object.
-        notes: List of note objects.
+        nutrition: Nutrition information object. Known keys: calories, carbohydrateContent, cholesterolContent, fatContent, fiberContent, proteinContent, saturatedFatContent, sodiumContent, sugarContent, transFatContent, unsaturatedFatContent.
+        settings: Recipe settings object. Known keys: public (bool), showNutrition (bool), showAssets (bool), landscapeView (bool), disableComments (bool), locked (bool).
+        notes: List of note objects with keys: title (str), text (str).
         extras: Custom key-value pairs for extended data.
         image: Image URL to scrape.
     """
@@ -546,9 +555,9 @@ async def update_recipe(
         tools: List of tool IDs or names.
         recipeIngredient: List of ingredient strings ("3 cups flour") or ingredient objects (display, quantity, note).
         recipeInstructions: List of instruction objects (text, title, summary).
-        nutrition: Nutrition information object.
-        settings: Recipe settings object.
-        notes: List of note objects.
+        nutrition: Nutrition information object. Known keys: calories, carbohydrateContent, cholesterolContent, fatContent, fiberContent, proteinContent, saturatedFatContent, sodiumContent, sugarContent, transFatContent, unsaturatedFatContent.
+        settings: Recipe settings object. Known keys: public (bool), showNutrition (bool), showAssets (bool), landscapeView (bool), disableComments (bool), locked (bool).
+        notes: List of note objects with keys: title (str), text (str).
         extras: Custom key-value pairs.
         image: Image URL to scrape.
     """
@@ -1564,7 +1573,7 @@ async def update_cookbooks(
 ) -> dict[str, Any]:
     """Bulk reorder or update cookbooks.
     Args:
-        cookbooks: List of cookbook objects with id, position, etc. (required).
+        cookbooks: List of cookbook objects. Each object must have an "id" field (cookbook UUID). Optional fields: name (str), description (str), position (int), public (bool), queryFilterString (str).
     """
     return await get_client().update_cookbooks(cookbooks, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
@@ -1635,6 +1644,7 @@ async def create_mealplan(
         recipeId: ID of the associated recipe.
         text: Additional text for the entry.
     """
+    entryType = _normalize_enum(entryType, {"breakfast", "lunch", "dinner", "side"}, "entryType")
     data = {"date": date, "entryType": entryType, "title": title}
     if recipeId:
         data["recipeId"] = recipeId
@@ -1677,6 +1687,8 @@ async def update_mealplan(
         recipeId: New recipe ID.
         text: New additional text.
     """
+    if entryType is not None:
+        entryType = _normalize_enum(entryType, {"breakfast", "lunch", "dinner", "side"}, "entryType")
     params = UpdateMealplanParam(
         date=date, entryType=entryType, title=title,
         recipeId=recipeId, text=text
@@ -1743,10 +1755,12 @@ async def create_mealplan_rule(
 ) -> dict[str, Any]:
     """Create a new mealplan rule.
     Args:
-        day: Day of the week (monday, tuesday, etc.) (required).
+        day: Day of the week (monday, tuesday, wednesday, thursday, friday, saturday, sunday) (required).
         entryType: Type of meal (breakfast, lunch, dinner, side). Defaults to "dinner".
         queryFilterString: Filter string for recipe selection.
     """
+    day = _normalize_enum(day, {"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}, "day")
+    entryType = _normalize_enum(entryType, {"breakfast", "lunch", "dinner", "side"}, "entryType")
     params = CreateMealplanRuleParam(day=day, entryType=entryType, queryFilterString=queryFilterString)
     return await get_client().create_mealplan_rule(
         params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
@@ -1764,10 +1778,14 @@ async def update_mealplan_rule(
     """Update an existing mealplan rule.
     Args:
         id: The ID of the mealplan rule to update (required).
-        day: New day of the week.
-        entryType: New meal type.
+        day: New day of the week (monday, tuesday, wednesday, thursday, friday, saturday, sunday).
+        entryType: New meal type (breakfast, lunch, dinner, side).
         queryFilterString: New filter string.
     """
+    if day is not None:
+        day = _normalize_enum(day, {"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}, "day")
+    if entryType is not None:
+        entryType = _normalize_enum(entryType, {"breakfast", "lunch", "dinner", "side"}, "entryType")
     params = UpdateMealplanRuleParam(day=day, entryType=entryType, queryFilterString=queryFilterString)
     return await get_client().update_mealplan_rule(
         id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
@@ -1873,7 +1891,7 @@ async def delete_shopping_list_by_id(
 @mcp.tool()
 async def update_shopping_list_label_settings(
     id: str,
-    labelId: str = "",
+    labelId: str,
     fontSize: float = 12.0,
     fontFamily: str = "Arial",
     ctx: Context = None
@@ -1881,13 +1899,14 @@ async def update_shopping_list_label_settings(
     """Update label settings for a shopping list.
     Args:
         id: The ID of the shopping list (required).
-        labelId: The label ID to associate.
+        labelId: The ID of an existing label to associate (required). Use get_all_labels() to find available labels.
         fontSize: Font size for labels. Defaults to 12.0.
         fontFamily: Font family for labels. Defaults to "Arial".
     """
+    if not labelId:
+        return {"error": "labelId is required. Use get_all_labels() to find available labels."}
     import uuid
-    payload = {"id": str(uuid.uuid4()), "shoppingListId": id, "fontSize": fontSize, "fontFamily": fontFamily}
-    payload["labelId"] = labelId if labelId else str(uuid.uuid4())
+    payload = {"id": str(uuid.uuid4()), "shoppingListId": id, "labelId": labelId, "fontSize": fontSize, "fontFamily": fontFamily}
     return await get_client().update_shopping_list_label_settings(id, payload, get_user_token())
 
 @mcp.tool()
@@ -2224,6 +2243,7 @@ async def create_timeline_event(
         eventType: Type of event (system, info, comment) (required).
         message: Event message text.
     """
+    eventType = _normalize_enum(eventType, {"system", "info", "comment"}, "eventType")
     params = CreateTimelineEventParam(recipeId=recipeId, eventType=eventType, message=message)
     return await get_client().create_timeline_event(
         params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
@@ -2243,6 +2263,8 @@ async def update_timeline_event(
         eventType: New event type (system, info, comment).
         message: New event message.
     """
+    if eventType is not None:
+        eventType = _normalize_enum(eventType, {"system", "info", "comment"}, "eventType")
     params = UpdateTimelineEventParam(eventType=eventType, message=message)
     return await get_client().update_timeline_event(
         id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
@@ -2373,6 +2395,7 @@ async def create_recipe_action(
         description: Description of the action.
         url: URL for the action (required for post type).
     """
+    recipeActionType = _normalize_enum(recipeActionType, {"link", "post"}, "recipeActionType")
     payload = {"name": name, "recipeActionType": recipeActionType, "description": description}
     if url:
         payload["url"] = url
@@ -2396,6 +2419,8 @@ async def update_recipe_action(
         recipeActionType: New action type (link, post).
         description: New description.
     """
+    if recipeActionType is not None:
+        recipeActionType = _normalize_enum(recipeActionType, {"link", "post"}, "recipeActionType")
     return await get_client().update_recipe_action(
         id, dict(filter(lambda x: x[1] is not None,
             [("name", name), ("recipeActionType", recipeActionType), ("description", description)])),
