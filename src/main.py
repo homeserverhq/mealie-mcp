@@ -281,6 +281,7 @@ class BulkCreateShoppingItem(BaseModel):
 
 class BulkUpdateShoppingItem(BaseModel):
     id: str
+    shoppingListId: Optional[str] = None
     quantity: Optional[float] = None
     note: Optional[str] = None
     display: Optional[str] = None

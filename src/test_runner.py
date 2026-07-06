@@ -380,6 +380,9 @@ STORE_KEYS = [
     "unit_keep", "unit_merge",
     "bulk_cb", "invitation",
     "comment_recipe_for_timeline", "timeline_recipe",
+    "image_test_recipe",
+    "bulk_del_1", "bulk_del_2",
+    "bulk_update_list",
 ]
 
 for k in STORE_KEYS:
@@ -682,6 +685,15 @@ async def main():
         await run_test(session, "O22 remove_recipe_from_shopping_list", "remove_recipe_from_shopping_list", {"id": pick_id("item_list") or "0", "recipeId": pick_id("main_recipe") or pick_slug("main_recipe") or "0"})
 
         # =================================================================
+        # Phase 7b: Recipe Image Operations
+        # =================================================================
+        log("\n=== Phase 7b: Recipe Image Operations ===")
+        await run_test_with_store(session, "O23 create_image_test_recipe", "create_recipe", {"name": make_name("ImageTestRecipe"), "description": "For image scraping tests"}, store_key="image_test_recipe")
+        await run_test(session, "O24 scrape_recipe_image_url", "scrape_recipe_image_url", {"slug": pick_slug("image_test_recipe") or "0", "url": "https://httpbin.org/image/jpeg"})
+        await run_test(session, "O25 delete_recipe_image", "delete_recipe_image", {"slug": pick_slug("image_test_recipe") or "0"})
+        await run_test(session, "O26 cleanup_image_recipe", "delete_recipe_by_slug", {"slug": pick_slug("image_test_recipe") or "0"})
+
+        # =================================================================
         # Phase 8: Bulk Actions
         # =================================================================
         log("\n=== Phase 8: Bulk Actions ===")
@@ -692,6 +704,14 @@ async def main():
         await run_test(session, "P3 bulk_update_recipe_settings", "bulk_update_recipe_settings", {"recipes": [pick_slug("main_recipe") or "0"], "settings": {"public": False}})
         await run_test(session, "P5 cleanup_bulk_tag", "delete_tag_by_id", {"id": pick_id("bulk_tag") or "0"})
         await run_test(session, "P6 cleanup_bulk_cat", "delete_category_by_id", {"id": pick_id("bulk_cat") or "0"})
+
+        # =================================================================
+        # Phase 8b: Bulk Delete Recipes
+        # =================================================================
+        log("\n=== Phase 8b: Bulk Delete Recipes ===")
+        await run_test_with_store(session, "P7 create_bulk_del_recipe_1", "create_recipe", {"name": make_name("BulkDel1"), "description": "For bulk delete test"}, store_key="bulk_del_1")
+        await run_test_with_store(session, "P8 create_bulk_del_recipe_2", "create_recipe", {"name": make_name("BulkDel2"), "description": "For bulk delete test"}, store_key="bulk_del_2")
+        await run_test(session, "P9 bulk_delete_recipes", "bulk_delete_recipes", {"recipes": [pick_slug("bulk_del_1") or "0", pick_slug("bulk_del_2") or "0"]})
 
         # =================================================================
         # Phase 9: Shopping List Operations
@@ -805,6 +825,30 @@ async def main():
         await run_test(session, "Z1 bulk_delete_shopping_items", "bulk_delete_shopping_items", {"ids": _z1_items if _z1_items else [str(uuid.uuid4())]})
 
         # =================================================================
+        # Phase 18b: Bulk Update Shopping Items
+        # =================================================================
+        log("\n=== Phase 18b: Bulk Update Shopping Items ===")
+        await run_test_with_store(session, "Z7 create_list_for_bulk_update", "create_shopping_list", {"name": make_name("BulkUpdateList")}, store_key="bulk_update_list")
+        _zu1_r = await session.call_tool("create_shopping_item", {"shoppingListId": pick_id("bulk_update_list") or "0", "quantity": 1, "note": "Z8 before update 1"})
+        _zu1_d = extract_content(_zu1_r)
+        _zu1_created = _zu1_d.get("createdItems", []) if isinstance(_zu1_d, dict) else []
+        _zu1_id = _zu1_created[0].get("id", "") if _zu1_created and isinstance(_zu1_created[0], dict) else ""
+        _zu2_r = await session.call_tool("create_shopping_item", {"shoppingListId": pick_id("bulk_update_list") or "0", "quantity": 2, "note": "Z8 before update 2"})
+        _zu2_d = extract_content(_zu2_r)
+        _zu2_created = _zu2_d.get("createdItems", []) if isinstance(_zu2_d, dict) else []
+        _zu2_id = _zu2_created[0].get("id", "") if _zu2_created and isinstance(_zu2_created[0], dict) else ""
+        _zu1_err = is_error(_zu1_r)
+        _zu2_err = is_error(_zu2_r)
+        not _zu1_err and results.append({"label": "Z8 create_bulk_update_item_1", "tool": "create_shopping_item", "status": "PASSED", "data": _zu1_d})
+        _zu1_err and results.append({"label": "Z8 create_bulk_update_item_1", "tool": "create_shopping_item", "status": "FAILED", "reason": _zu1_err})
+        not _zu2_err and results.append({"label": "Z9 create_bulk_update_item_2", "tool": "create_shopping_item", "status": "PASSED", "data": _zu2_d})
+        _zu2_err and results.append({"label": "Z9 create_bulk_update_item_2", "tool": "create_shopping_item", "status": "FAILED", "reason": _zu2_err})
+        log(f"  {'FAIL' if _zu1_err else 'PASS'} Z8 create_bulk_update_item_1")
+        log(f"  {'FAIL' if _zu2_err else 'PASS'} Z9 create_bulk_update_item_2")
+        await run_test(session, "ZA bulk_update_shopping_items", "bulk_update_shopping_items", {"items": [{"id": _zu1_id or "0", "shoppingListId": pick_id("bulk_update_list") or "0", "checked": True, "note": "Z8 updated item 1"}, {"id": _zu2_id or "0", "shoppingListId": pick_id("bulk_update_list") or "0", "note": "Z8 updated item 2"}]})
+        await run_test(session, "ZB cleanup_bulk_update_list", "delete_shopping_list_by_id", {"id": pick_id("bulk_update_list") or "0"})
+
+        # =================================================================
         # Phase 20: Recipe Ingredient/Instruction Verification
         # =================================================================
         log("\n=== Phase 20: Recipe Ingredient/Instruction Verification ===")
@@ -891,6 +935,12 @@ async def main():
         _aa6_ok = _aa6_ing == 3 and _aa6_ins == 2 and _aa6_tags == 1 and _aa6_cats == 1 and _aa6_tools == 1
         _aa6_reason = f"Expected 3 ing/2 ins/1 tag/1 cat/1 tool, got {_aa6_ing}/{_aa6_ins}/{_aa6_tags}/{_aa6_cats}/{_aa6_tools}"
         assert_and_record("AA6 verify_updated_ingredient_counts", "get_recipe_by_slug", _aa6_ok, _aa6_reason, {"ingredients": _aa6_ing, "instructions": _aa6_ins, "tags": _aa6_tags, "categories": _aa6_cats, "tools": _aa6_tools})
+
+        # =================================================================
+        # Phase 21: Purge Exports (last — destructive to export data)
+        # =================================================================
+        log("\n=== Phase 21: Purge Exports ===")
+        await run_test(session, "AC1 purge_exports", "purge_exports")
 
         # =================================================================
         # Phase 19: Cleanup

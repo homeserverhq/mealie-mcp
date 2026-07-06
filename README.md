@@ -2,7 +2,7 @@
 
 This repository contains a Model Context Protocol (MCP) server that acts
 as a secure, multi-tenant proxy between an AI Assistant and the Mealie
-backend API. It exposes **161 MCP tools** covering 22 resource domains
+backend API. It exposes **160 MCP tools** covering 22 resource domains
 with full CRUD, meal planning, recipe scraping, and bulk operations.
 
 ## ✨ Features
@@ -13,14 +13,14 @@ with full CRUD, meal planning, recipe scraping, and bulk operations.
 - **👥 Multi-Tenancy** — Uses Python `contextvars` to maintain thread-safe
   user identity isolation, ensuring all AI-driven actions are scoped to
   the authenticated user's permissions.
-- **📊 Full Mealie Coverage** — 161 tools mapped to Mealie API endpoints
+- **📊 Full Mealie Coverage** — 160 tools mapped to Mealie API endpoints
   across 22 resource domains.
 - **⚡ TOON Optimization** — Bulk list responses are automatically compressed
   using TOON (Token-Optimized Object Notation) to reduce token consumption
   and maximize context window efficiency.
 - **🚀 Efficient Gets** — GET responses return only commonly used fields by
   default. Full objects are available via an `include_all_fields` flag.
-- **🧪 Comprehensive Testing** — 202 automated tests covering all tool
+- **🧪 Comprehensive Testing** — 212 automated tests covering all tool
   domains, run via the test runner pipeline.
 
 ## 🔧 Environment Variables
@@ -81,9 +81,9 @@ The MCP server serves at `http://mealie-mcp:80/mcp` (Streamable HTTP).
 
 ## 🛠️ API Tool Mapping
 
-The server implements 161 MCP tools organized into the following categories:
+The server implements 160 MCP tools organized into the following categories:
 
-### 🍲 Recipes (23 tools)
+### 🍲 Recipes (22 tools)
 
 - `get_all_recipes` — List all recipes with pagination and search
 - `get_recipe_by_slug` — Get a single recipe by slug
@@ -105,7 +105,6 @@ The server implements 161 MCP tools organized into the following categories:
 - `bulk_tag_recipes` — Bulk assign tags to recipes
 - `bulk_categorize_recipes` — Bulk assign categories
 - `bulk_delete_recipes` — Bulk delete recipes
-- `bulk_export_recipes` — Bulk export recipes
 - `list_exports` — List bulk export data files
 - `purge_exports` — Purge all export data
 
