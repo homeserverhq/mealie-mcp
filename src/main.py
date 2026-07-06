@@ -894,7 +894,7 @@ async def update_recipe_last_made(
     Args:
         slug: The slug of the recipe.
     """
-    return await get_client().update_recipe_last_made(slug, get_user_token())
+    return await get_client().update_recipe_last_made(slug, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 @mcp.tool()
 async def bulk_update_recipe_settings(
@@ -942,7 +942,8 @@ async def create_recipe_from_url(
     """
     params = CreateRecipeFromUrlParam(url=url, includeTags=includeTags, includeNutrition=includeNutrition)
     result = await get_client().create_recipe_from_url(
-        params.url, get_user_token(), includeTags=params.includeTags, includeNutrition=params.includeNutrition
+        params.url, get_user_token(), includeTags=params.includeTags, includeNutrition=params.includeNutrition,
+        include_all_fields=ALLOW_ALL_AGGREGATE
     )
     if isinstance(result, str):
         return {"slug": result}
@@ -957,7 +958,7 @@ async def create_recipe_from_url_bulk(
     Args:
         urls: List of recipe URLs to scrape.
     """
-    return await get_client().create_recipe_from_url_bulk(urls, get_user_token())
+    return await get_client().create_recipe_from_url_bulk(urls, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 @mcp.tool()
 async def create_recipe_from_html_or_json(
@@ -968,7 +969,7 @@ async def create_recipe_from_html_or_json(
     Args:
         data: HTML content or JSON-LD recipe data.
     """
-    result = await get_client().create_recipe_from_html_or_json(data, get_user_token())
+    result = await get_client().create_recipe_from_html_or_json(data, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
     if isinstance(result, str):
         return {"slug": result}
     return result if isinstance(result, dict) else {"result": result}
@@ -996,7 +997,7 @@ async def scrape_recipe_image_url(
         slug: The slug of the recipe.
         url: The image URL to scrape.
     """
-    return await get_client().scrape_recipe_image_url(slug, url, get_user_token())
+    return await get_client().scrape_recipe_image_url(slug, url, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 @mcp.tool()
 async def delete_recipe_image(
@@ -2158,7 +2159,7 @@ async def update_shopping_list_label_settings(
     params = UpdateShoppingListLabelSettingsParam(
         id=str(uuid.uuid4()), shoppingListId=id, labelId=labelId, fontSize=fontSize, fontFamily=fontFamily
     )
-    return await get_client().update_shopping_list_label_settings(id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token())
+    return await get_client().update_shopping_list_label_settings(id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 @mcp.tool()
 async def add_recipe_to_shopping_list(

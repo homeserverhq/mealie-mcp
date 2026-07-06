@@ -203,9 +203,12 @@ class MealieClient:
             data = _filter_fields(data, COMMON_FIELDS["recipe"])
         return data
 
-    async def update_recipe_last_made(self, slug: str, api_key: Optional[str] = None) -> Any:
+    async def update_recipe_last_made(self, slug: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         now = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        return await self.patch(f"/api/recipes/{slug}/last-made", api_key, json={"timestamp": now})
+        data = await self.patch(f"/api/recipes/{slug}/last-made", api_key, json={"timestamp": now})
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["recipe"])
+        return data
 
     async def get_recipe_suggestions(self, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         data = await self.get("/api/recipes/suggestions", api_key)
@@ -213,21 +216,33 @@ class MealieClient:
             data = _filter_fields(data, COMMON_FIELDS["recipe"])
         return data
 
-    async def create_recipe_from_url(self, url: str, api_key: Optional[str] = None, includeTags: bool = True, includeNutrition: bool = False) -> Any:
+    async def create_recipe_from_url(self, url: str, api_key: Optional[str] = None, includeTags: bool = True, includeNutrition: bool = False, include_all_fields: bool = False) -> Any:
         payload: dict[str, Any] = {"url": url, "includeTags": includeTags, "includeNutrition": includeNutrition}
-        return await self.post("/api/recipes/create/url", api_key, json=payload)
+        data = await self.post("/api/recipes/create/url", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["recipe"])
+        return data
 
-    async def create_recipe_from_url_bulk(self, urls: list[str], api_key: Optional[str] = None) -> Any:
-        return await self.post("/api/recipes/create/url/bulk", api_key, json={"imports": [{"url": u} for u in urls]})
+    async def create_recipe_from_url_bulk(self, urls: list[str], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/recipes/create/url/bulk", api_key, json={"imports": [{"url": u} for u in urls]})
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["recipe"])
+        return data
 
-    async def create_recipe_from_html_or_json(self, data: str, api_key: Optional[str] = None) -> Any:
-        return await self.post("/api/recipes/create/html-or-json", api_key, json={"data": data})
+    async def create_recipe_from_html_or_json(self, data: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        result = await self.post("/api/recipes/create/html-or-json", api_key, json={"data": data})
+        if not include_all_fields and isinstance(result, dict):
+            result = _filter_fields(result, COMMON_FIELDS["recipe"])
+        return result
 
     async def test_scrape_url(self, url: str, api_key: Optional[str] = None) -> Any:
         return await self.post("/api/recipes/test-scrape-url", api_key, json={"url": url})
 
-    async def scrape_recipe_image_url(self, slug: str, url: str, api_key: Optional[str] = None) -> Any:
-        return await self.post(f"/api/recipes/{slug}/image", api_key, json={"url": url})
+    async def scrape_recipe_image_url(self, slug: str, url: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post(f"/api/recipes/{slug}/image", api_key, json={"url": url})
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["recipe"])
+        return data
 
     async def delete_recipe_image(self, slug: str, api_key: Optional[str] = None) -> Any:
         return await self.delete(f"/api/recipes/{slug}/image", api_key)
@@ -733,8 +748,11 @@ class MealieClient:
     async def delete_shopping_list_by_id(self, list_id: str, api_key: Optional[str] = None) -> Any:
         return await self.delete(f"/api/households/shopping/lists/{list_id}", api_key)
 
-    async def update_shopping_list_label_settings(self, list_id: str, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return await self.put(f"/api/households/shopping/lists/{list_id}/label-settings", api_key, json=[payload])
+    async def update_shopping_list_label_settings(self, list_id: str, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.put(f"/api/households/shopping/lists/{list_id}/label-settings", api_key, json=[payload])
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["shopping_list"])
+        return data
 
     async def add_recipe_to_shopping_list(self, list_id: str, recipe_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         data = await self.post(f"/api/households/shopping/lists/{list_id}/recipe", api_key, json=[{"recipeId": recipe_id}])
