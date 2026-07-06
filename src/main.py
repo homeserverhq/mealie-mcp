@@ -642,14 +642,14 @@ async def create_recipe(
         recipeYield: Yield amount text.
         recipeYieldQuantity: Yield quantity number.
         orgURL: Original URL the recipe was sourced from.
-        recipeCategory: List of CategoryObjectInput with name and slug. Slug is used to find existing categories; if not found, a new category is created.
-        tags: List of TagObjectInput with name and slug. Slug is used to find existing tags; if not found, a new tag is created.
-        tools: List of ToolObjectInput with name and slug. Slug is used to find existing tools; if not found, a new tool is created.
-        recipeIngredient: List of ingredient strings ("3 cups flour") or ingredient objects (display, quantity, note).
-        recipeInstructions: List of instruction objects (text, title, summary).
-        nutrition: NutritionInput object with optional fields: calories, carbohydrateContent, cholesterolContent, fatContent, fiberContent, proteinContent, saturatedFatContent, sodiumContent, sugarContent, transFatContent, unsaturatedFatContent.
-        settings: Recipe settings object. Known keys: public (bool), showNutrition (bool), showAssets (bool), landscapeView (bool), disableComments (bool), locked (bool).
-        notes: List of note objects with keys: title (str), text (str).
+        recipeCategory: Categories for the recipe.
+        tags: Tags for the recipe.
+        tools: Tools for the recipe.
+        recipeIngredient: Ingredient strings or objects.
+        recipeInstructions: Instruction steps.
+        nutrition: Nutrition information.
+        settings: Recipe settings.
+        notes: Recipe notes.
         image: Image URL to scrape.
     """
     params = CreateRecipeParam(
@@ -774,14 +774,14 @@ async def update_recipe(
         recipeYield: Yield amount text.
         recipeYieldQuantity: Yield quantity number.
         orgURL: Original URL the recipe was sourced from.
-        recipeCategory: List of CategoryObjectInput with name and slug. Slug is used to find existing categories; if not found, a new category is created.
-        tags: List of TagObjectInput with name and slug. Slug is used to find existing tags; if not found, a new tag is created.
-        tools: List of ToolObjectInput with name and slug. Slug is used to find existing tools; if not found, a new tool is created.
-        recipeIngredient: List of ingredient strings ("3 cups flour") or ingredient objects (display, quantity, note).
-        recipeInstructions: List of instruction objects (text, title, summary).
-        nutrition: NutritionInput object with optional fields: calories, carbohydrateContent, cholesterolContent, fatContent, fiberContent, proteinContent, saturatedFatContent, sodiumContent, sugarContent, transFatContent, unsaturatedFatContent.
-        settings: Recipe settings object. Known keys: public (bool), showNutrition (bool), showAssets (bool), landscapeView (bool), disableComments (bool), locked (bool).
-        notes: List of note objects with keys: title (str), text (str).
+        recipeCategory: Categories for the recipe.
+        tags: Tags for the recipe.
+        tools: Tools for the recipe.
+        recipeIngredient: Ingredient strings or objects.
+        recipeInstructions: Instruction steps.
+        nutrition: Nutrition information.
+        settings: Recipe settings.
+        notes: Recipe notes.
         image: Image URL to scrape.
     """
     params = UpdateRecipeParam(
@@ -905,7 +905,7 @@ async def bulk_update_recipe_settings(
     """Bulk update settings for multiple recipes (partial update).
     Args:
         recipes: List of recipe slugs.
-        settings: Settings object with any subset of: public, show_nutrition, show_assets, landscape_view, disable_comments, locked. Only provided fields are updated on each recipe.
+        settings: Settings to apply to each recipe.
     """
     if not recipes or not settings:
         return {"status": "error", "message": "recipes and settings are required"}
@@ -1037,7 +1037,7 @@ async def bulk_tag_recipes(
     """Bulk assign tags to recipes.
     Args:
         recipes: List of recipe slugs to tag.
-        tags: List of TagObjectInput with name and slug. Slug is used to find existing tags; if not found, a new tag is created. Duplicate slugs are collapsed.
+        tags: Tags to assign to recipes.
     """
     if not recipes or not tags:
         return {"status": "error", "message": "recipes and tags are required"}
@@ -1054,7 +1054,7 @@ async def bulk_categorize_recipes(
     """Bulk assign categories to recipes.
     Args:
         recipes: List of recipe slugs to categorize.
-        categories: List of CategoryObjectInput with name and slug. Slug is used to find existing categories; if not found, a new category is created. Duplicate slugs are collapsed.
+        categories: Categories to assign to recipes.
     """
     if not recipes or not categories:
         return {"status": "error", "message": "recipes and categories are required"}
@@ -1825,7 +1825,7 @@ async def update_cookbooks(
 ) -> dict[str, Any]:
     """Bulk reorder or update cookbooks.
     Args:
-        cookbooks: List of cookbook update objects. Each must have an "id" field (cookbook UUID). Optional fields: name, description, position, public, queryFilterString.
+        cookbooks: Cookbooks to update.
     """
     payload = [c.model_dump(exclude_none=True) for c in cookbooks]
     return await get_client().update_cookbooks(payload, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
@@ -2316,11 +2316,7 @@ async def bulk_create_shopping_items(
 ) -> dict[str, Any]:
     """Bulk create shopping list items.
 
-    Each item requires `shoppingListId` (UUID of the target list).
-    Optional fields: `quantity` (0), `note` (""), `display` (""),
-    `checked` (false), `position` (0), `foodId`, `labelId`, `unitId`.
-
-    Rendering: Mealie formats each item as "{quantity} {display}".
+    Mealie formats each item as "{quantity} {display}".
     - quantity=0 (default): display text used as-is
       Example: display="1 pound ground beef" → renders "1 pound ground beef"
     - quantity>0: leading number prepended
@@ -2341,10 +2337,8 @@ async def bulk_update_shopping_items(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Bulk update shopping list items.
-
-    Each item requires `id` (UUID of the item to update).
-    Optional fields: `quantity`, `note`, `display`, `checked`, `position`,
-    `foodId`, `labelId`, `unitId`. Only provided fields are updated.
+    Args:
+        items: Shopping items to update.
     """
     normalized = [item.model_dump(exclude_unset=True, exclude_none=True) for item in items]
     return await get_client().bulk_update_shopping_items(normalized, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
