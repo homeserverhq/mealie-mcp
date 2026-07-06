@@ -98,12 +98,12 @@ class CategoryObjectInput(BaseModel):
 
 class BulkRecipeSettingsInput(BaseModel):
     """Settings fields for bulk update. All fields optional - only provided fields are updated on each recipe."""
-    public: Optional[bool] = Field(default=None, description="If true, the recipe is publicly visible. If false, it is private. Omit to leave unchanged.")
-    show_nutrition: Optional[bool] = Field(default=None, description="If true, show nutrition information on the recipe. If false, hide it. Omit to leave unchanged.")
-    show_assets: Optional[bool] = Field(default=None, description="If true, show recipe assets on the recipe page. If false, hide them. Omit to leave unchanged.")
-    landscape_view: Optional[bool] = Field(default=None, description="If true, display the recipe in landscape orientation. If false, use portrait. Omit to leave unchanged.")
-    disable_comments: Optional[bool] = Field(default=None, description="If true, comments are disabled on this recipe. If false, comments are allowed. Omit to leave unchanged.")
-    locked: Optional[bool] = Field(default=None, description="If true, the recipe is locked and cannot be edited. If false, editing is allowed. Omit to leave unchanged.")
+    public: Optional[bool] = Field(default=None, description="true = public, false = private.")
+    show_nutrition: Optional[bool] = Field(default=None, description="true = show nutrition, false = hide.")
+    show_assets: Optional[bool] = Field(default=None, description="true = show assets, false = hide.")
+    landscape_view: Optional[bool] = Field(default=None, description="true = landscape, false = portrait.")
+    disable_comments: Optional[bool] = Field(default=None, description="true = comments disabled, false = enabled.")
+    locked: Optional[bool] = Field(default=None, description="true = locked, false = editable.")
 
 class ToolObjectInput(BaseModel):
     """Tool object for recipe operations. Slug is used to find existing tools; if not found, a new tool is created with the given name and slug. Duplicate slugs in the same request are collapsed."""
@@ -112,26 +112,26 @@ class ToolObjectInput(BaseModel):
 
 class NutritionInput(BaseModel):
     """Nutrition information for a recipe. All fields optional. Values are numeric strings without units."""
-    calories: Optional[str] = Field(default=None, description="Total calorie count as a numeric string (e.g. '250'). Do not include units.")
-    carbohydrateContent: Optional[str] = Field(default=None, description="Total carbohydrates in grams as a numeric string (e.g. '32'). Do not include units.")
-    cholesterolContent: Optional[str] = Field(default=None, description="Cholesterol in milligrams as a numeric string (e.g. '55'). Do not include units.")
-    fatContent: Optional[str] = Field(default=None, description="Total fat in grams as a numeric string (e.g. '12.5'). Do not include units.")
-    fiberContent: Optional[str] = Field(default=None, description="Dietary fiber in grams as a numeric string (e.g. '3'). Do not include units.")
-    proteinContent: Optional[str] = Field(default=None, description="Protein in grams as a numeric string (e.g. '18'). Do not include units.")
-    saturatedFatContent: Optional[str] = Field(default=None, description="Saturated fat in grams as a numeric string (e.g. '4'). Do not include units.")
-    sodiumContent: Optional[str] = Field(default=None, description="Sodium in milligrams as a numeric string (e.g. '480'). Do not include units.")
-    sugarContent: Optional[str] = Field(default=None, description="Sugar in grams as a numeric string (e.g. '8'). Do not include units.")
-    transFatContent: Optional[str] = Field(default=None, description="Trans fat in grams as a numeric string (e.g. '0.5'). Do not include units.")
-    unsaturatedFatContent: Optional[str] = Field(default=None, description="Unsaturated fat in grams as a numeric string (e.g. '6'). Do not include units.")
+    calories: Optional[str] = Field(default=None, description="Numeric string, no units (e.g. '250').")
+    carbohydrateContent: Optional[str] = Field(default=None, description="Grams as numeric string (e.g. '32').")
+    cholesterolContent: Optional[str] = Field(default=None, description="Milligrams as numeric string (e.g. '55').")
+    fatContent: Optional[str] = Field(default=None, description="Grams as numeric string (e.g. '12.5').")
+    fiberContent: Optional[str] = Field(default=None, description="Grams as numeric string (e.g. '3').")
+    proteinContent: Optional[str] = Field(default=None, description="Grams as numeric string (e.g. '18').")
+    saturatedFatContent: Optional[str] = Field(default=None, description="Grams as numeric string (e.g. '4').")
+    sodiumContent: Optional[str] = Field(default=None, description="Milligrams as numeric string (e.g. '480').")
+    sugarContent: Optional[str] = Field(default=None, description="Grams as numeric string (e.g. '8').")
+    transFatContent: Optional[str] = Field(default=None, description="Grams as numeric string (e.g. '0.5').")
+    unsaturatedFatContent: Optional[str] = Field(default=None, description="Grams as numeric string (e.g. '6').")
 
 class RecipeSettingsParam(BaseModel):
     """Recipe settings. Only provided fields are updated."""
-    public: Optional[bool] = Field(default=None, description="If true, the recipe is publicly visible. If false, it is private. Omit to leave unchanged.")
-    showNutrition: Optional[bool] = Field(default=None, description="If true, show nutrition information on the recipe page. If false, hide it. Omit to leave unchanged.")
-    showAssets: Optional[bool] = Field(default=None, description="If true, show recipe assets on the recipe page. If false, hide them. Omit to leave unchanged.")
-    landscapeView: Optional[bool] = Field(default=None, description="If true, display the recipe in landscape orientation. If false, use portrait. Omit to leave unchanged.")
-    disableComments: Optional[bool] = Field(default=None, description="If true, comments are disabled on this recipe. If false, comments are allowed. Omit to leave unchanged.")
-    locked: Optional[bool] = Field(default=None, description="If true, the recipe is locked and cannot be edited. If false, editing is allowed. Omit to leave unchanged.")
+    public: Optional[bool] = Field(default=None, description="true = public, false = private.")
+    showNutrition: Optional[bool] = Field(default=None, description="true = show nutrition, false = hide.")
+    showAssets: Optional[bool] = Field(default=None, description="true = show assets, false = hide.")
+    landscapeView: Optional[bool] = Field(default=None, description="true = landscape, false = portrait.")
+    disableComments: Optional[bool] = Field(default=None, description="true = comments disabled, false = enabled.")
+    locked: Optional[bool] = Field(default=None, description="true = locked, false = editable.")
 
 class RecipeNoteParam(BaseModel):
     """Recipe note."""
@@ -235,9 +235,9 @@ class CookbookUpdateItemParam(BaseModel):
     id: str = Field(description="Cookbook UUID.")
     name: Optional[str] = Field(default=None, description="New name for the cookbook.")
     description: Optional[str] = Field(default=None, description="New description.")
-    position: Optional[int] = Field(default=None, description="New display order position in the list (0 = top). Items are sorted by this value in ascending order.")
-    public: Optional[bool] = Field(default=None, description="If true, the cookbook is publicly visible. If false, it is private. Omit to leave unchanged.")
-    queryFilterString: Optional[str] = Field(default=None, description="Mealie query filter string that determines which recipes appear in this cookbook. Use Mealie filter syntax. Omit to leave unchanged.")
+    position: Optional[int] = Field(default=None, description="Display order (0 = top, ascending).")
+    public: Optional[bool] = Field(default=None, description="true = public, false = private.")
+    queryFilterString: Optional[str] = Field(default=None, description="Mealie filter for recipe selection.")
 
 class CreateMealplanParam(BaseModel):
     date: str
@@ -286,8 +286,8 @@ class BulkCreateShoppingItem(BaseModel):
     quantity: float = Field(default=0, description="Quantity of the item.")
     note: str = Field(default="", description="Note for the item.")
     display: str = Field(default="", description="Display text for the item.")
-    checked: bool = Field(default=False, description="Set to true to mark the item as checked off (purchased). Set to false to leave unchecked. Default: false.")
-    position: int = Field(default=0, description="Display order position in the shopping list (0 = top). Items are sorted by this value in ascending order.")
+    checked: bool = Field(default=False, description="true = checked (purchased), false = unchecked. Default: false.")
+    position: int = Field(default=0, description="Display order (0 = top, ascending).")
     foodId: Optional[str] = Field(default=None, description="Food UUID to associate.")
     labelId: Optional[str] = Field(default=None, description="Label UUID to associate.")
     unitId: Optional[str] = Field(default=None, description="Unit UUID to associate.")
@@ -299,8 +299,8 @@ class BulkUpdateShoppingItem(BaseModel):
     quantity: Optional[float] = Field(default=None, description="New quantity.")
     note: Optional[str] = Field(default=None, description="New note.")
     display: Optional[str] = Field(default=None, description="New display text.")
-    checked: Optional[bool] = Field(default=None, description="Set to true to mark the item as checked off (purchased). Set to false to mark as unchecked. Omit to leave unchanged.")
-    position: Optional[int] = Field(default=None, description="New display order position (0 = top). Items are sorted ascending. Omit to leave unchanged.")
+    checked: Optional[bool] = Field(default=None, description="true = checked, false = unchecked.")
+    position: Optional[int] = Field(default=None, description="New display order (0 = top, ascending).")
     foodId: Optional[str] = Field(default=None, description="New food UUID.")
     labelId: Optional[str] = Field(default=None, description="New label UUID.")
     unitId: Optional[str] = Field(default=None, description="New unit UUID.")
@@ -440,10 +440,10 @@ class UpdateRecipeActionParam(BaseModel):
 class SetHouseholdPermissionsParam(BaseModel):
     """Parameters for setting household permissions for a user."""
     userId: str = Field(description="User UUID to set permissions for.")
-    canManage: bool = Field(default=False, description="If true, the user can manage group members (add/remove/edit roles). If false, this permission is denied. Default: false.")
-    canManageHousehold: bool = Field(default=False, description="If true, the user can manage household-level preferences and settings. If false, this permission is denied. Default: false.")
-    canInvite: bool = Field(default=False, description="If true, the user can send household invitations. If false, this permission is denied. Default: false.")
-    canOrganize: bool = Field(default=False, description="If true, the user can organize recipes into categories and tags. If false, this permission is denied. Default: false.")
+    canManage: bool = Field(default=False, description="true = manage members (add/remove/roles). Default: false.")
+    canManageHousehold: bool = Field(default=False, description="true = manage household prefs/settings. Default: false.")
+    canInvite: bool = Field(default=False, description="true = can invite members. Default: false.")
+    canOrganize: bool = Field(default=False, description="true = organize recipes/categories/tags. Default: false.")
 
 class CreateHouseholdParam(BaseModel):
     """Parameters for creating a new household via admin API."""
@@ -937,8 +937,8 @@ async def create_recipe_from_url(
     """Create a recipe by scraping a URL.
     Args:
         url: The URL of the recipe to scrape.
-        includeTags: Set to true to include tags scraped from the URL. Set to false to skip tags. Default: true.
-        includeNutrition: Set to true to include nutrition data scraped from the URL. Set to false to skip nutrition data. Default: false.
+        includeTags: true = include scraped tags, false = skip. Default: true.
+        includeNutrition: true = include scraped nutrition, false = skip. Default: false.
     """
     params = CreateRecipeFromUrlParam(url=url, includeTags=includeTags, includeNutrition=includeNutrition)
     result = await get_client().create_recipe_from_url(
@@ -1560,8 +1560,8 @@ async def create_unit(
         pluralName: Plural name of the unit.
         pluralAbbreviation: Plural abbreviation.
         description: Description of the unit.
-        fraction: If true, display unit values as fractions (e.g. 1/2) instead of decimals. If false, display as decimal numbers. Default: false.
-        useAbbreviation: If true, display uses the abbreviation (e.g. 'c' instead of 'cup'). If false, display uses the full name. Default: false.
+        fraction: true = fractions (e.g. 1/2), false = decimals. Default: false.
+        useAbbreviation: true = abbreviation (e.g. 'c'), false = full name. Default: false.
         aliases: List of alias names.
     """
     params = CreateUnitParam(
@@ -1595,8 +1595,8 @@ async def update_unit(
         pluralName: New plural name.
         pluralAbbreviation: New plural abbreviation.
         description: New description.
-        fraction: If true, display unit values as fractions. If false, display as decimal numbers. Omit to leave unchanged.
-        useAbbreviation: If true, display uses the abbreviation. If false, display uses the full name. Omit to leave unchanged.
+        fraction: true = fractions, false = decimals.
+        useAbbreviation: true = abbreviation, false = full name.
         aliases: New list of aliases.
     """
     params = UpdateUnitParam(
@@ -1766,8 +1766,8 @@ async def create_cookbook(
         name: Name of the cookbook.
         description: Description of the cookbook.
         position: Display position. Defaults to 0.
-        public: Set to true to make the cookbook publicly visible. Set to false to keep it private. Default: false.
-        queryFilterString: Mealie query filter string that determines which recipes appear in this cookbook (e.g. 'tags = tag1 AND category = cat1'). Use an empty string for no filter. See Mealie docs for filter syntax.
+        public: true = public, false = private. Default: false.
+        queryFilterString: Mealie filter for recipe selection (e.g. 'tags = tag1'). Empty = no filter.
     """
     params = CreateCookbookParam(
         name=name, description=description, position=position,
@@ -1794,8 +1794,8 @@ async def update_cookbook(
         name: New name.
         description: New description.
         position: New display position.
-        public: Set to true to make the cookbook publicly visible. Set to false to make it private. Omit to leave unchanged.
-        queryFilterString: Mealie query filter string that determines which recipes appear in this cookbook. Use Mealie filter syntax. Omit to leave unchanged.
+        public: true = public, false = private.
+        queryFilterString: Mealie filter for recipe selection.
     """
     params = UpdateCookbookParam(
         name=name, description=description, position=position,
@@ -2010,7 +2010,7 @@ async def create_mealplan_rule(
     Args:
         day: Day of the week (monday, tuesday, wednesday, thursday, friday, saturday, sunday).
         entryType: Type of meal (breakfast, lunch, dinner, side). Defaults to "dinner".
-        queryFilterString: Mealie query filter string for selecting recipes for this rule (e.g. 'tags = tag1'). Use an empty string for no filter. See Mealie docs for filter syntax.
+        queryFilterString: Mealie filter for recipe selection (e.g. 'tags = tag1'). Empty = no filter.
     """
     day = _normalize_enum(day, {"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}, "day")
     entryType = _normalize_enum(entryType, {"breakfast", "lunch", "dinner", "side"}, "entryType")
@@ -2033,7 +2033,7 @@ async def update_mealplan_rule(
         id: The ID of the mealplan rule to update.
         day: New day of the week (monday, tuesday, wednesday, thursday, friday, saturday, sunday).
         entryType: New meal type (breakfast, lunch, dinner, side).
-        queryFilterString: Mealie query filter string for selecting recipes for this rule. Use Mealie filter syntax. Omit to leave unchanged.
+        queryFilterString: Mealie filter for recipe selection.
     """
     if day is not None:
         day = _normalize_enum(day, {"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}, "day")
@@ -2241,7 +2241,7 @@ async def create_shopping_item(
         quantity: Item quantity. Renders as leading number when > 0. Defaults to 0.
         note: Note describing the item.
         display: Display text for the item.
-        checked: Set to true to mark the item as checked off (purchased). Set to false to leave unchecked. Default: false.
+        checked: true = checked (purchased), false = unchecked. Default: false.
         foodId: ID of the associated food.
         labelId: ID of the associated label.
         unitId: ID of the associated unit.
@@ -2279,7 +2279,7 @@ async def update_shopping_item(
         quantity: New quantity.
         note: New note.
         display: New display text.
-        checked: Set to true to mark as checked off (purchased). Set to false to mark as unchecked. Omit to leave unchanged.
+        checked: true = checked, false = unchecked.
         foodId: New food ID.
         labelId: New label ID.
         unitId: New unit ID.
@@ -2747,7 +2747,7 @@ async def create_event_notification(
     """Create a new event notification rule.
     Args:
         name: Name of the notification.
-        enabled: Set to true to enable the notification on creation. Set to false to create it in a disabled state. Default: true.
+        enabled: true = enabled, false = disabled. Default: true.
     """
     params = CreateEventNotificationParam(name=name, enabled=enabled)
     return await get_client().create_event_notification(
@@ -2766,7 +2766,7 @@ async def update_event_notification(
     Args:
         id: The ID of the event notification to update.
         name: New name.
-        enabled: Set to true to enable the notification. Set to false to disable it. Omit to leave unchanged.
+        enabled: true = enabled, false = disabled.
     """
     params = UpdateEventNotificationParam(name=name, enabled=enabled)
     return await get_client().update_event_notification(
@@ -2844,7 +2844,7 @@ async def create_webhook(
     Args:
         name: Name of the webhook.
         url: The URL to send webhook events to.
-        enabled: Set to true to enable the webhook on creation. Set to false to create it in a disabled state. Default: true.
+        enabled: true = enabled, false = disabled. Default: true.
     """
     params = CreateWebhookParam(name=name, url=url, enabled=enabled)
     return await get_client().create_webhook(
@@ -2865,7 +2865,7 @@ async def update_webhook(
         id: The ID of the webhook to update.
         name: New name.
         url: New webhook URL.
-        enabled: Set to true to enable the webhook. Set to false to disable it. Omit to leave unchanged.
+        enabled: true = enabled, false = disabled.
     """
     params = UpdateWebhookParam(name=name, url=url, enabled=enabled)
     return await get_client().update_webhook(
@@ -3103,7 +3103,7 @@ async def update_group_preferences(
 ) -> dict[str, Any]:
     """Update the current group's preferences.
     Args:
-        privateGroup: Set to true to make the group private (hidden from other users). Set to false to make it public. Default: false.
+        privateGroup: true = private (hidden), false = public. Default: false.
     """
     return await get_client().update_group_preferences(
         {"privateGroup": privateGroup}, get_user_token()
@@ -3194,7 +3194,7 @@ async def update_household_preferences(
 ) -> dict[str, Any]:
     """Update the current household's preferences.
     Args:
-        privateHousehold: Set to true to make the household private (hidden from other users). Set to false to make it public. Default: false.
+        privateHousehold: true = private (hidden), false = public. Default: false.
     """
     return await get_client().update_household_preferences(
         {"privateHousehold": privateHousehold}, get_user_token()
@@ -3212,10 +3212,10 @@ async def set_household_permissions(
     """Set household permissions for a user.
     Args:
         userId: The ID of the user to set permissions for.
-        canManage: Set to true to grant the user permission to manage group members (add/remove/edit roles). Set to false to deny. Default: false.
-        canManageHousehold: Set to true to grant the user permission to manage household-level preferences and settings. Set to false to deny. Default: false.
-        canInvite: Set to true to allow the user to send household invitations. Set to false to deny. Default: false.
-        canOrganize: Set to true to allow the user to organize recipes into categories and tags. Set to false to deny. Default: false.
+        canManage: true = manage members (add/remove/roles). Default: false.
+        canManageHousehold: true = manage household prefs/settings. Default: false.
+        canInvite: true = can invite members. Default: false.
+        canOrganize: true = organize recipes/categories/tags. Default: false.
     """
     params = SetHouseholdPermissionsParam(
         userId=userId, canManage=canManage, canManageHousehold=canManageHousehold,
@@ -3251,13 +3251,13 @@ async def create_user(
         fullName: Full display name of the user.
         email: Email address for the user.
         password: Password for the user account.
-        admin: Set to true to make the user an admin. Set to false for a regular user. Default: false.
+        admin: true = admin, false = regular user. Default: false.
         group: Group name to assign the user to. Default None.
         household: Household name to assign the user to. Default None.
-        canInvite: Set to true to allow the user to send household invitations. Set to false to deny. Default: false.
-        canManage: Set to true to allow the user to manage group members (add/remove/edit roles). Set to false to deny. Default: false.
-        canManageHousehold: Set to true to allow the user to manage household-level preferences and settings. Set to false to deny. Default: false.
-        canOrganize: Set to true to allow the user to create, edit, and delete tags, categories, and foods. Set to false to deny. Default: false.
+        canInvite: true = can invite members. Default: false.
+        canManage: true = manage members (add/remove/roles). Default: false.
+        canManageHousehold: true = manage household prefs/settings. Default: false.
+        canOrganize: true = create/edit/delete tags, categories, foods. Default: false.
     """
     params = CreateUserParam(
         username=username, fullName=fullName, email=email, password=password,
@@ -3299,13 +3299,13 @@ async def update_user(
         username: Username for the user.
         fullName: Full display name of the user.
         email: Email address for the user.
-        admin: Set to true to make the user an admin. Set to false for a regular user. Default: false.
+        admin: true = admin, false = regular user. Default: false.
         group: Group name to assign the user to. Default None.
         household: Household name to assign the user to. Default None.
-        canInvite: Set to true to allow the user to send household invitations. Set to false to deny. Default: false.
-        canManage: Set to true to allow the user to manage group members (add/remove/edit roles). Set to false to deny. Default: false.
-        canManageHousehold: Set to true to allow the user to manage household-level preferences and settings. Set to false to deny. Default: false.
-        canOrganize: Set to true to allow the user to create, edit, and delete tags, categories, and foods. Set to false to deny. Default: false.
+        canInvite: true = can invite members. Default: false.
+        canManage: true = manage members (add/remove/roles). Default: false.
+        canManageHousehold: true = manage household prefs/settings. Default: false.
+        canOrganize: true = create/edit/delete tags, categories, foods. Default: false.
     """
     params = UpdateUserParam(
         username=username, fullName=fullName, email=email, admin=admin,
