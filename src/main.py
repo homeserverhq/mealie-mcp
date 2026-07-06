@@ -295,7 +295,7 @@ class BulkCreateShoppingItem(BaseModel):
 class BulkUpdateShoppingItem(BaseModel):
     """Shopping item for bulk update."""
     id: str = Field(description="Shopping item UUID to update.")
-    shoppingListId: Optional[str] = Field(default=None, description="Shopping list UUID (required by Mealie API).")
+    shoppingListId: Optional[str] = Field(default=None, description="Shopping list UUID.")
     quantity: Optional[float] = Field(default=None, description="New quantity.")
     note: Optional[str] = Field(default=None, description="New note.")
     display: Optional[str] = Field(default=None, description="New display text.")
@@ -2238,7 +2238,7 @@ async def create_shopping_item(
     """Create a new shopping list item.
     Args:
         shoppingListId: The ID of the shopping list.
-        quantity: Item quantity. Renders as leading number when > 0. Defaults to 0.
+        quantity: Quantity of the item.
         note: Note describing the item.
         display: Display text for the item.
         checked: true = checked (purchased), false = unchecked. Default: false.
@@ -2275,7 +2275,7 @@ async def update_shopping_item(
     """Update an existing shopping list item.
     Args:
         id: The ID of the shopping item to update.
-        shoppingListId: The ID of the shopping list this item belongs to (required by Mealie API).
+        shoppingListId: The shopping list this item belongs to.
         quantity: New quantity.
         note: New note.
         display: New display text.
@@ -2314,15 +2314,7 @@ async def bulk_create_shopping_items(
     items: list[BulkCreateShoppingItem],
     ctx: Context = None
 ) -> dict[str, Any]:
-    """Bulk create shopping list items.
-
-    Mealie formats each item as "{quantity} {display}".
-    - quantity=0 (default): display text used as-is
-      Example: display="1 pound ground beef" → renders "1 pound ground beef"
-    - quantity>0: leading number prepended
-      Example: quantity=2, display="cups flour" → renders "2 cups flour"
-    If `note` is empty, it falls back to `display`.
-    """
+    """Bulk create shopping list items."""
     normalized = []
     for item in items:
         entry = item.model_dump(exclude_none=True)
