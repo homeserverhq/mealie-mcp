@@ -781,6 +781,9 @@ class MealieClient:
     async def bulk_delete_shopping_items(self, item_ids: list[str], api_key: Optional[str] = None) -> Any:
         return await self.request("DELETE", "/api/households/shopping/items", api_key, json={"ids": item_ids})
 
+    async def delete_shopping_item_by_id(self, item_id: str, api_key: Optional[str] = None) -> Any:
+        return await self.request("DELETE", f"/api/households/shopping/items/{item_id}", api_key)
+
     # =========================================================================
     # Labels
     # =========================================================================

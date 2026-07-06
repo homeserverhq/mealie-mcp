@@ -2188,6 +2188,7 @@ async def create_shopping_item(
 @mcp.tool()
 async def update_shopping_item(
     id: str,
+    shoppingListId: str = "",
     quantity: float = None,
     note: str = None,
     display: str = None,
@@ -2202,6 +2203,7 @@ async def update_shopping_item(
     """Update an existing shopping list item.
     Args:
         id: The ID of the shopping item to update (required).
+        shoppingListId: The ID of the shopping list this item belongs to (required by Mealie API).
         quantity: New quantity.
         note: New note.
         display: New display text.
@@ -2217,8 +2219,11 @@ async def update_shopping_item(
         position=position, foodId=foodId, labelId=labelId,
         unitId=unitId, extras=extras
     )
+    payload = params.model_dump(exclude_unset=True, exclude_none=True)
+    if shoppingListId:
+        payload["shoppingListId"] = shoppingListId
     return await get_client().update_shopping_item(
-        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        id, payload, get_user_token(),
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
