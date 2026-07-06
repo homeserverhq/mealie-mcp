@@ -250,9 +250,6 @@ class MealieClient:
     async def bulk_delete_recipes(self, recipes: list[str], api_key: Optional[str] = None) -> Any:
         return await self.post("/api/recipes/bulk-actions/delete", api_key, json={"recipes": recipes})
 
-    async def bulk_export_recipes(self, recipes: list[str], api_key: Optional[str] = None) -> Any:
-        return await self.post("/api/recipes/bulk-actions/export", api_key, json={"recipes": recipes})
-
     async def list_exports(self, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         data = await self.get("/api/recipes/bulk-actions/export", api_key)
         if not include_all_fields:

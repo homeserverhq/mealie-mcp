@@ -325,19 +325,19 @@ def assert_and_record(label: str, tool: str, ok: bool, reason: str = "", data: A
 # =============================================================================
 
 INGREDIENT_TEST_DATA = [
-    "3 small green cabbages (outer leaves removed, cores trimmed to create pockets)",
-    "1 lb large shrimp (peeled and deveined)",
-    "12 oz smoked sausage (kielbasa or andouille, sliced)",
-    "8 oz bacon (chopped)",
-    "1 red bell pepper (diced)",
-    "1 green bell pepper (diced)",
-    "1 small onion (diced)",
-    "3 cloves garlic (minced)",
-    "2 tbsp Cajun seasoning (or Old Bay)",
-    "1 tsp smoked paprika",
-    "1/4 cup olive oil or melted butter",
-    "Fresh parsley (for garnish)",
-    "Salt, black pepper, and crushed red pepper flakes (to taste)",
+    {"display": "3 small green cabbages (outer leaves removed, cores trimmed to create pockets)"},
+    {"display": "1 lb large shrimp (peeled and deveined)"},
+    {"display": "12 oz smoked sausage (kielbasa or andouille, sliced)"},
+    {"display": "8 oz bacon (chopped)"},
+    {"display": "1 red bell pepper (diced)"},
+    {"display": "1 green bell pepper (diced)"},
+    {"display": "1 small onion (diced)"},
+    {"display": "3 cloves garlic (minced)"},
+    {"display": "2 tbsp Cajun seasoning (or Old Bay)"},
+    {"display": "1 tsp smoked paprika"},
+    {"display": "1/4 cup olive oil or melted butter"},
+    {"display": "Fresh parsley (for garnish)"},
+    {"display": "Salt, black pepper, and crushed red pepper flakes (to taste)"},
 ]
 
 INSTRUCTION_TEST_DATA = [
@@ -874,7 +874,7 @@ async def main():
         _aa3_bad_displays = []
         for _aa3_idx, _aa3_ing in enumerate(_aa3_ings):
             _aa3_display = _aa3_ing.get("display", "") if isinstance(_aa3_ing, dict) else ""
-            _aa3_expected = INGREDIENT_TEST_DATA[_aa3_idx] if _aa3_idx < len(INGREDIENT_TEST_DATA) else ""
+            _aa3_expected = INGREDIENT_TEST_DATA[_aa3_idx].get("display", "") if _aa3_idx < len(INGREDIENT_TEST_DATA) else ""
             if _aa3_display != _aa3_expected:
                 _aa3_display_ok = False
                 _aa3_bad_displays.append(f"ing[{_aa3_idx}]: expected={_aa3_expected[:40]!r}, got={_aa3_display[:40]!r}")
@@ -906,7 +906,7 @@ async def main():
         await run_test_with_store(session, "AA4 update_recipe_ingredients", "update_recipe", {
             "slug": pick_slug("ingredient_recipe") or "0",
             "description": "Updated ingredient/instruction test",
-            "recipeIngredient": ["3 small green cabbages (outer leaves removed, cores trimmed to create pockets)", "1 lb large shrimp (peeled and deveined)", "12 oz smoked sausage (kielbasa or andouille, sliced)"],
+            "recipeIngredient": [{"display": "3 small green cabbages (outer leaves removed, cores trimmed to create pockets)"}, {"display": "1 lb large shrimp (peeled and deveined)"}, {"display": "12 oz smoked sausage (kielbasa or andouille, sliced)"}],
             "recipeInstructions": [{"text": "Preheat your oven to 375\u00b0F (190\u00b0C).", "title": "Prep Oven"}, {"text": "In a large skillet over medium heat, cook the chopped bacon until crispy. Remove the bacon bits with a slotted spoon and set aside on a paper towel, leaving the rendered fat in the pan.", "title": "Crisp the Bacon"}],
             "tags": [{"name": "Cajun", "slug": "cajun"}],
             "recipeCategory": [{"name": "Main Course", "slug": "main-course"}],

@@ -461,10 +461,6 @@ class UpdateHouseholdParam(BaseModel):
     name: str = Field(description="New name for the household.")
     groupId: str = Field(description="Group UUID the household belongs to.")
 
-def _str_or_pass(v):
-    return str(v) if isinstance(v, int) else v
-
-
 def _normalize_enum(value: str, valid: set[str], param_name: str) -> str:
     if not value:
         return value
@@ -521,8 +517,6 @@ async def get_recipe_by_slug(
 
 
 def _format_ingredient(i) -> dict:
-    if isinstance(i, str):
-        return {"display": i, "note": i, "quantity": 0, "referenceId": str(uuid.uuid4())}
     if hasattr(i, 'model_dump'):
         i = i.model_dump()
     if isinstance(i, dict):
@@ -531,7 +525,7 @@ def _format_ingredient(i) -> dict:
         ing.pop("food", None)
         ing.setdefault("referenceId", str(uuid.uuid4()))
         ing.setdefault("quantity", 0)
-        ing.setdefault("note", ing.get("display", ""))
+        ing["note"] = ing.get("display", ing.get("note", ""))
         return ing
     return {"display": str(i), "note": str(i), "quantity": 0, "referenceId": str(uuid.uuid4())}
 
@@ -590,29 +584,6 @@ def _add_recipe_urls(recipe: dict, public_hostname: str) -> dict:
     return result
 
 
-async def _resolve_label_list(
-    items: list,
-    fetch_func,
-    create_func,
-    token: str
-) -> list:
-    if not items:
-        return items
-    all_items = await fetch_func(token, page=1, perPage=500)
-    items_list = all_items.get("items", [])
-    result = []
-    for item in items:
-        if isinstance(item, str):
-            found = next((x for x in items_list if x.get("name", "").lower() == item.lower()), None)
-            if found:
-                result.append({"id": found["id"], "name": found["name"], "slug": found["slug"]})
-            else:
-                created = await create_func({"name": item}, token)
-                result.append({"id": created["id"], "name": created["name"], "slug": created["slug"]})
-        elif isinstance(item, dict):
-            result.append(item)
-    return result
-
 
 async def _bulk_patch_recipes(
     recipes: list,
@@ -620,7 +591,7 @@ async def _bulk_patch_recipes(
     resolved_value: list,
     token: str
 ) -> dict[str, Any]:
-    """Workaround for broken bulk tag/categorize endpoints."""
+    """Apply a field value to multiple recipes via individual PATCH calls. Bulk endpoint is a no-op in Mealie."""
     if not recipes:
         return {"status": "success", "count": 0, "failed": 0}
 
@@ -641,48 +612,22 @@ async def _bulk_patch_recipes(
     }
 
 
-async def _bulk_settings_update(
-    recipes: list,
-    settings: dict,
-    token: str
-) -> dict[str, Any]:
-    """Workaround for broken bulk settings endpoint."""
-    if not recipes:
-        return {"status": "success", "count": 0, "failed": 0}
-
-    success_count = 0
-    failed_count = 0
-    for slug in recipes:
-        try:
-            await get_client().patch_recipe(slug, {"settings": settings}, token)
-            success_count += 1
-        except Exception:
-            failed_count += 1
-
-    return {
-        "status": "success" if failed_count == 0 else "partial",
-        "count": success_count,
-        "failed": failed_count,
-        "total": len(recipes)
-    }
-
-
 @mcp.tool()
 async def create_recipe(
     name: str,
     description: str = "",
     recipeServings: float = 0,
-    totalTime: str | int = "",
-    prepTime: str | int = "",
-    cookTime: str | int = "",
-    performTime: str | int = "",
+    totalTime: str = "",
+    prepTime: str = "",
+    cookTime: str = "",
+    performTime: str = "",
     recipeYield: str = "",
     recipeYieldQuantity: float = 0,
     orgURL: str = "",
     recipeCategory: list[CategoryObjectInput] = [],
     tags: list[TagObjectInput] = [],
     tools: list[ToolObjectInput] = [],
-    recipeIngredient: list[str | RecipeIngredientParam] = [],
+    recipeIngredient: list[RecipeIngredientParam] = [],
     recipeInstructions: list[RecipeInstructionParam] = [],
     nutrition: Optional[NutritionInput] = None,
     settings: RecipeSettingsParam = None,
@@ -714,10 +659,6 @@ async def create_recipe(
         extras: Custom key-value pairs (string keys and string values) for extended data.
         image: Image URL to scrape.
     """
-    totalTime = _str_or_pass(totalTime)
-    prepTime = _str_or_pass(prepTime)
-    cookTime = _str_or_pass(cookTime)
-    performTime = _str_or_pass(performTime)
     params = CreateRecipeParam(
         name=name, description=description, recipeServings=recipeServings,
         totalTime=totalTime, prepTime=prepTime, cookTime=cookTime, performTime=performTime,
@@ -810,21 +751,21 @@ async def update_recipe(
     name: str = None,
     description: str = None,
     recipeServings: float = None,
-    totalTime: str | int = None,
-    prepTime: str | int = None,
-    cookTime: str | int = None,
-    performTime: str | int = None,
+    totalTime: str = None,
+    prepTime: str = None,
+    cookTime: str = None,
+    performTime: str = None,
     recipeYield: str = None,
     recipeYieldQuantity: float = None,
     orgURL: str = None,
-    recipeCategory: list[CategoryObjectInput] | None = None,
-    tags: list[TagObjectInput] | None = None,
-    tools: list[ToolObjectInput] | None = None,
-    recipeIngredient: list[str | RecipeIngredientParam] | None = None,
+    recipeCategory: list[CategoryObjectInput] = None,
+    tags: list[TagObjectInput] = None,
+    tools: list[ToolObjectInput] = None,
+    recipeIngredient: list[RecipeIngredientParam] = None,
     recipeInstructions: list[RecipeInstructionParam] = None,
     nutrition: Optional[NutritionInput] = None,
     settings: RecipeSettingsParam = None,
-    notes: list[RecipeNoteParam] | None = None,
+    notes: list[RecipeNoteParam] = None,
     extras: dict = None,
     image: str = None,
     ctx: Context = None
@@ -853,10 +794,6 @@ async def update_recipe(
         extras: Custom key-value pairs (string keys and string values).
         image: Image URL to scrape.
     """
-    totalTime = _str_or_pass(totalTime)
-    prepTime = _str_or_pass(prepTime)
-    cookTime = _str_or_pass(cookTime)
-    performTime = _str_or_pass(performTime)
     params = UpdateRecipeParam(
         name=name, description=description, recipeServings=recipeServings,
         totalTime=totalTime, prepTime=prepTime, cookTime=cookTime, performTime=performTime,
@@ -987,7 +924,7 @@ async def bulk_update_recipe_settings(
     if not settings_dict:
         return {"status": "error", "message": "at least one settings field must be provided"}
 
-    return await _bulk_settings_update(recipes, settings_dict, get_user_token())
+    return await get_client().bulk_update_recipe_settings(recipes, settings_dict, get_user_token())
 
 @mcp.tool()
 async def get_recipe_suggestions(
@@ -1534,7 +1471,7 @@ async def update_food(
     name: str = None,
     description: str = None,
     pluralName: str = None,
-    aliases: list[str] | None = None,
+    aliases: list[str] = None,
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update an existing food.
@@ -1657,7 +1594,7 @@ async def update_unit(
     description: str = None,
     fraction: bool = None,
     useAbbreviation: bool = None,
-    aliases: list[str] | None = None,
+    aliases: list[str] = None,
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update an existing unit.
