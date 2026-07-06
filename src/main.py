@@ -480,6 +480,7 @@ async def list_all_recipes(
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all recipes in your Mealie instance.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
@@ -504,6 +505,7 @@ async def get_recipe_by_slug(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a single recipe by its slug.
+
     Args:
         slug: The unique slug of the recipe.
         include_all_fields: Default False (common fields only). Set True for all fields.
@@ -632,6 +634,7 @@ async def create_recipe(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a new recipe.
+
     Args:
         name: Name of the recipe.
         description: Description of the recipe.
@@ -763,6 +766,7 @@ async def update_recipe(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update an existing recipe.
+
     Args:
         slug: The unique slug of the recipe to update.
         name: Name of the recipe.
@@ -869,6 +873,7 @@ async def delete_recipe_by_slug(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Delete a recipe by its slug.
+
     Args:
         slug: The unique slug of the recipe to delete.
     """
@@ -881,6 +886,7 @@ async def duplicate_recipe(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Duplicate an existing recipe.
+
     Args:
         slug: The slug of the recipe to duplicate.
     """
@@ -892,6 +898,7 @@ async def update_recipe_last_made(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update the 'last made' timestamp for a recipe.
+
     Args:
         slug: The slug of the recipe.
     """
@@ -904,6 +911,7 @@ async def bulk_update_recipe_settings(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Bulk update settings for multiple recipes (partial update).
+
     Args:
         recipes: List of recipe slugs.
         settings: Settings to apply to each recipe.
@@ -923,6 +931,7 @@ async def list_recipe_suggestions(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get recipe suggestions based on available foods and tools.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
     """
@@ -936,6 +945,7 @@ async def create_recipe_from_url(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a recipe by scraping a URL.
+
     Args:
         url: The URL of the recipe to scrape.
         includeTags: true = include scraped tags, false = skip. Default: true.
@@ -956,6 +966,7 @@ async def create_recipe_from_url_bulk(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Bulk create recipes by scraping multiple URLs.
+
     Args:
         urls: List of recipe URLs to scrape.
     """
@@ -967,6 +978,7 @@ async def create_recipe_from_html_or_json(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a recipe from raw HTML or JSON-LD data.
+
     Args:
         data: HTML content or JSON-LD recipe data.
     """
@@ -981,6 +993,7 @@ async def test_scrape_url(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Test-scrape a URL to see what data would be extracted (debug endpoint).
+
     Args:
         url: The URL to test-scrape.
     """
@@ -994,6 +1007,7 @@ async def scrape_recipe_image_url(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Scrape an image URL into a recipe.
+
     Args:
         slug: The slug of the recipe.
         url: The image URL to scrape.
@@ -1006,6 +1020,7 @@ async def delete_recipe_image(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Delete a recipe's image.
+
     Args:
         slug: The slug of the recipe.
     """
@@ -1025,6 +1040,7 @@ async def export_recipe(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Export a recipe in a specific format.
+
     Args:
         slug: The slug of the recipe to export.
     """
@@ -1037,6 +1053,7 @@ async def bulk_tag_recipes(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Bulk assign tags to recipes.
+
     Args:
         recipes: List of recipe slugs to tag.
         tags: Tags to assign to recipes.
@@ -1054,6 +1071,7 @@ async def bulk_categorize_recipes(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Bulk assign categories to recipes.
+
     Args:
         recipes: List of recipe slugs to categorize.
         categories: Categories to assign to recipes.
@@ -1070,6 +1088,7 @@ async def bulk_delete_recipes(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Bulk delete recipes.
+
     Args:
         recipes: List of recipe slugs to delete.
     """
@@ -1082,6 +1101,7 @@ async def list_exports(
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all bulk export data files.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
     """
@@ -1107,6 +1127,7 @@ async def list_all_categories(
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all recipe categories.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
@@ -1125,6 +1146,7 @@ async def get_category_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a single category by its ID.
+
     Args:
         id: The unique ID of the category.
         include_all_fields: Default False (common fields only). Set True for all fields.
@@ -1138,6 +1160,7 @@ async def get_category_by_slug(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a single category by its slug.
+
     Args:
         slug: The unique slug of the category.
         include_all_fields: Default False (common fields only). Set True for all fields.
@@ -1150,6 +1173,7 @@ async def list_empty_categories(
     ctx: Context = None
 ) -> dict[str, Any]:
     """List categories that have no associated recipes.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
     """
@@ -1162,6 +1186,7 @@ async def create_category(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a new category.
+
     Args:
         name: Name of the category.
     """
@@ -1178,6 +1203,7 @@ async def update_category(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update an existing category.
+
     Args:
         id: The ID of the category to update.
         name: New name for the category.
@@ -1194,6 +1220,7 @@ async def delete_category_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Delete a category by its ID.
+
     Args:
         id: The unique ID of the category to delete.
     """
@@ -1212,6 +1239,7 @@ async def list_all_tags(
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all recipe tags.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
@@ -1230,6 +1258,7 @@ async def get_tag_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a single tag by its ID.
+
     Args:
         id: The unique ID of the tag.
         include_all_fields: Default False (common fields only). Set True for all fields.
@@ -1243,6 +1272,7 @@ async def get_tag_by_slug(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a single tag by its slug.
+
     Args:
         slug: The unique slug of the tag.
         include_all_fields: Default False (common fields only). Set True for all fields.
@@ -1255,6 +1285,7 @@ async def list_empty_tags(
     ctx: Context = None
 ) -> dict[str, Any]:
     """List tags that have no associated recipes.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
     """
@@ -1267,6 +1298,7 @@ async def create_tag(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a new tag.
+
     Args:
         name: Name of the tag.
     """
@@ -1283,6 +1315,7 @@ async def update_tag(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update an existing tag.
+
     Args:
         id: The ID of the tag to update.
         name: New name for the tag.
@@ -1299,6 +1332,7 @@ async def delete_tag_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Delete a tag by its ID.
+
     Args:
         id: The unique ID of the tag to delete.
     """
@@ -1317,6 +1351,7 @@ async def list_all_tools(
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all recipe tools.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
@@ -1335,6 +1370,7 @@ async def get_tool_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a single tool by its ID.
+
     Args:
         id: The unique ID of the tool.
         include_all_fields: Default False (common fields only). Set True for all fields.
@@ -1348,6 +1384,7 @@ async def get_tool_by_slug(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a single tool by its slug.
+
     Args:
         slug: The unique slug of the tool.
         include_all_fields: Default False (common fields only). Set True for all fields.
@@ -1360,6 +1397,7 @@ async def create_tool(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a new tool.
+
     Args:
         name: Name of the tool.
     """
@@ -1376,6 +1414,7 @@ async def update_tool(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update an existing tool.
+
     Args:
         id: The ID of the tool to update.
         name: New name for the tool.
@@ -1392,6 +1431,7 @@ async def delete_tool_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Delete a tool by its ID.
+
     Args:
         id: The unique ID of the tool to delete.
     """
@@ -1410,6 +1450,7 @@ async def list_all_foods(
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all ingredient foods.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
@@ -1428,6 +1469,7 @@ async def get_food_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a single food by its ID.
+
     Args:
         id: The unique ID of the food.
         include_all_fields: Default False (common fields only). Set True for all fields.
@@ -1443,6 +1485,7 @@ async def create_food(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a new ingredient food.
+
     Args:
         name: Name of the food.
         description: Description of the food.
@@ -1467,6 +1510,7 @@ async def update_food(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update an existing food.
+
     Args:
         id: The ID of the food to update.
         name: New name for the food.
@@ -1488,6 +1532,7 @@ async def delete_food_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Delete a food by its ID.
+
     Args:
         id: The unique ID of the food to delete.
     """
@@ -1501,6 +1546,7 @@ async def merge_foods(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Merge two foods together.
+
     Args:
         food_to_keep: ID of the food to keep.
         food_to_merge: ID of the food to merge into the kept food.
@@ -1519,6 +1565,7 @@ async def list_all_units(
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all ingredient units.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
@@ -1537,6 +1584,7 @@ async def get_unit_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a single unit by its ID.
+
     Args:
         id: The unique ID of the unit.
         include_all_fields: Default False (common fields only). Set True for all fields.
@@ -1556,6 +1604,7 @@ async def create_unit(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a new ingredient unit.
+
     Args:
         name: Name of the unit.
         abbreviation: Abbreviation for the unit.
@@ -1590,6 +1639,7 @@ async def update_unit(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update an existing unit.
+
     Args:
         id: The ID of the unit to update.
         name: New name.
@@ -1617,6 +1667,7 @@ async def delete_unit_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Delete a unit by its ID.
+
     Args:
         id: The unique ID of the unit to delete.
     """
@@ -1630,6 +1681,7 @@ async def merge_units(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Merge two units together.
+
     Args:
         unit_to_keep: ID of the unit to keep.
         unit_to_merge: ID of the unit to merge into the kept unit.
@@ -1648,6 +1700,7 @@ async def list_all_comments(
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all recipe comments.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
@@ -1666,6 +1719,7 @@ async def get_comment_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a single comment by its ID.
+
     Args:
         id: The unique ID of the comment.
         include_all_fields: Default False (common fields only). Set True for all fields.
@@ -1679,6 +1733,7 @@ async def create_comment(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a new comment on a recipe.
+
     Args:
         recipeId: The ID of the recipe to comment on.
         text: The comment text.
@@ -1696,6 +1751,7 @@ async def update_comment(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update an existing comment.
+
     Args:
         id: The ID of the comment to update.
         text: New text for the comment.
@@ -1712,6 +1768,7 @@ async def delete_comment_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Delete a comment by its ID.
+
     Args:
         id: The unique ID of the comment to delete.
     """
@@ -1730,6 +1787,7 @@ async def list_all_cookbooks(
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all cookbooks.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
@@ -1748,6 +1806,7 @@ async def get_cookbook_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a single cookbook by its ID.
+
     Args:
         id: The unique ID of the cookbook.
         include_all_fields: Default False (common fields only). Set True for all fields.
@@ -1764,6 +1823,7 @@ async def create_cookbook(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a new cookbook.
+
     Args:
         name: Name of the cookbook.
         description: Description of the cookbook.
@@ -1791,6 +1851,7 @@ async def update_cookbook(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update an existing cookbook.
+
     Args:
         id: The ID of the cookbook to update.
         name: New name.
@@ -1814,6 +1875,7 @@ async def delete_cookbook_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Delete a cookbook by its ID.
+
     Args:
         id: The unique ID of the cookbook to delete.
     """
@@ -1826,6 +1888,7 @@ async def update_cookbooks(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Bulk reorder or update cookbooks.
+
     Args:
         cookbooks: Cookbooks to update.
     """
@@ -1846,6 +1909,7 @@ async def list_all_mealplans(
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all mealplan entries.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
@@ -1867,6 +1931,7 @@ async def get_mealplan_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a single mealplan entry by its ID.
+
     Args:
         id: The unique ID of the mealplan entry.
         include_all_fields: Default False (common fields only). Set True for all fields.
@@ -1879,6 +1944,7 @@ async def list_todays_meals(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get today's mealplans.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
     """
@@ -1895,6 +1961,7 @@ async def create_mealplan(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a new mealplan entry.
+
     Args:
         date: Date only (YYYY-MM-DD).
         entryType: Type of meal (breakfast, lunch, dinner, side). Defaults to "dinner".
@@ -1916,6 +1983,7 @@ async def create_random_mealplan(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a random mealplan entry using configured rules.
+
     Args:
         date: Date only (YYYY-MM-DD). Defaults to today.
     """
@@ -1934,6 +2002,7 @@ async def update_mealplan(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update an existing mealplan entry.
+
     Args:
         id: The ID of the mealplan entry to update.
         date: Date only (YYYY-MM-DD).
@@ -1959,6 +2028,7 @@ async def delete_mealplan_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Delete a mealplan entry by its ID.
+
     Args:
         id: The unique ID of the mealplan entry to delete.
     """
@@ -1977,6 +2047,7 @@ async def list_all_mealplan_rules(
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all mealplan rules.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
@@ -1995,6 +2066,7 @@ async def get_mealplan_rule_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a single mealplan rule by ID.
+
     Args:
         id: The unique ID of the mealplan rule.
         include_all_fields: Default False (common fields only). Set True for all fields.
@@ -2009,6 +2081,7 @@ async def create_mealplan_rule(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a new mealplan rule.
+
     Args:
         day: Day of the week (monday, tuesday, wednesday, thursday, friday, saturday, sunday).
         entryType: Type of meal (breakfast, lunch, dinner, side). Defaults to "dinner".
@@ -2031,6 +2104,7 @@ async def update_mealplan_rule(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update an existing mealplan rule.
+
     Args:
         id: The ID of the mealplan rule to update.
         day: New day of the week (monday, tuesday, wednesday, thursday, friday, saturday, sunday).
@@ -2053,6 +2127,7 @@ async def delete_mealplan_rule_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Delete a mealplan rule by its ID.
+
     Args:
         id: The unique ID of the mealplan rule to delete.
     """
@@ -2071,6 +2146,7 @@ async def list_all_shopping_lists(
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all shopping lists.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
@@ -2089,6 +2165,7 @@ async def get_shopping_list_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a single shopping list by its ID.
+
     Args:
         id: The unique ID of the shopping list.
         include_all_fields: Default False (common fields only). Set True for all fields.
@@ -2101,6 +2178,7 @@ async def create_shopping_list(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a new shopping list.
+
     Args:
         name: Name of the shopping list.
     """
@@ -2117,6 +2195,7 @@ async def update_shopping_list(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update an existing shopping list.
+
     Args:
         id: The ID of the shopping list to update.
         name: New name.
@@ -2133,6 +2212,7 @@ async def delete_shopping_list_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Delete a shopping list by its ID.
+
     Args:
         id: The unique ID of the shopping list to delete.
     """
@@ -2148,6 +2228,7 @@ async def update_shopping_list_label_settings(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update label settings for a shopping list.
+
     Args:
         id: The ID of the shopping list.
         labelId: The ID of an existing label to associate. Use list_all_labels() to find available labels.
@@ -2169,6 +2250,7 @@ async def add_recipe_to_shopping_list(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Add recipe ingredients to a shopping list.
+
     Args:
         id: The ID of the shopping list.
         recipeId: The ID of the recipe whose ingredients to add.
@@ -2182,6 +2264,7 @@ async def remove_recipe_from_shopping_list(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Remove recipe ingredients from a shopping list.
+
     Args:
         id: The ID of the shopping list.
         recipeId: The ID of the recipe whose ingredients to remove.
@@ -2200,6 +2283,7 @@ async def list_all_shopping_items(
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all shopping list items.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
@@ -2218,6 +2302,7 @@ async def get_shopping_item_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a single shopping list item by its ID.
+
     Args:
         id: The unique ID of the shopping item.
         include_all_fields: Default False (common fields only). Set True for all fields.
@@ -2238,6 +2323,7 @@ async def create_shopping_item(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a new shopping list item.
+
     Args:
         shoppingListId: The ID of the shopping list.
         quantity: Quantity of the item.
@@ -2275,6 +2361,7 @@ async def update_shopping_item(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update an existing shopping list item.
+
     Args:
         id: The ID of the shopping item to update.
         shoppingListId: The shopping list this item belongs to.
@@ -2305,6 +2392,7 @@ async def delete_shopping_item_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Delete a shopping list item by its ID.
+
     Args:
         id: The unique ID of the shopping item to delete.
     """
@@ -2331,6 +2419,7 @@ async def bulk_update_shopping_items(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Bulk update shopping list items.
+
     Args:
         items: Shopping items to update.
     """
@@ -2343,6 +2432,7 @@ async def bulk_delete_shopping_items(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Bulk delete shopping list items by IDs.
+
     Args:
         ids: List of shopping item IDs to delete.
     """
@@ -2360,6 +2450,7 @@ async def list_all_labels(
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all multi-purpose labels.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
@@ -2378,6 +2469,7 @@ async def get_label_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a single label by its ID.
+
     Args:
         id: The unique ID of the label.
         include_all_fields: Default False (common fields only). Set True for all fields.
@@ -2391,6 +2483,7 @@ async def create_label(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a new label.
+
     Args:
         name: Name of the label.
         color: Color hex code (e.g. '#FF5733').
@@ -2409,6 +2502,7 @@ async def update_label(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update an existing label.
+
     Args:
         id: The ID of the label to update.
         name: New name.
@@ -2426,6 +2520,7 @@ async def delete_label_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Delete a label by its ID.
+
     Args:
         id: The unique ID of the label to delete.
     """
@@ -2444,6 +2539,7 @@ async def list_all_timeline_events(
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all recipe timeline events.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
@@ -2462,6 +2558,7 @@ async def get_timeline_event_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a single timeline event by its ID.
+
     Args:
         id: The unique ID of the timeline event.
         include_all_fields: Default False (common fields only). Set True for all fields.
@@ -2476,6 +2573,7 @@ async def create_timeline_event(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a new recipe timeline event.
+
     Args:
         recipeId: The ID of the recipe.
         eventType: Type of event (system, info, comment).
@@ -2496,6 +2594,7 @@ async def update_timeline_event(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update an existing timeline event.
+
     Args:
         id: The ID of the timeline event to update.
         eventType: New event type (system, info, comment).
@@ -2515,6 +2614,7 @@ async def delete_timeline_event_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Delete a timeline event by its ID.
+
     Args:
         id: The unique ID of the timeline event to delete.
     """
@@ -2532,6 +2632,7 @@ async def list_all_shared_recipes(
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all shared recipe tokens.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
         recipeId: Filter by recipe ID.
@@ -2549,6 +2650,7 @@ async def get_shared_recipe_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a shared recipe by its public token ID.
+
     Args:
         id: The public token ID of the shared recipe.
         include_all_fields: Default False (common fields only). Set True for all fields.
@@ -2561,6 +2663,7 @@ async def create_shared_recipe(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a share token for a recipe.
+
     Args:
         recipeId: The ID of the recipe to share.
     """
@@ -2576,6 +2679,7 @@ async def delete_shared_recipe_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Delete a shared recipe token.
+
     Args:
         id: The token ID of the shared recipe to delete.
     """
@@ -2594,6 +2698,7 @@ async def list_all_recipe_actions(
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all recipe actions.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
@@ -2612,6 +2717,7 @@ async def get_recipe_action_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a single recipe action by its ID.
+
     Args:
         id: The unique ID of the recipe action.
         include_all_fields: Default False (common fields only). Set True for all fields.
@@ -2627,6 +2733,7 @@ async def create_recipe_action(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a new recipe action.
+
     Args:
         name: Name of the action.
         recipeActionType: Type of action (link, post).
@@ -2650,6 +2757,7 @@ async def update_recipe_action(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update an existing recipe action.
+
     Args:
         id: The ID of the recipe action to update.
         name: New name.
@@ -2671,6 +2779,7 @@ async def delete_recipe_action_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Delete a recipe action by its ID.
+
     Args:
         id: The unique ID of the recipe action to delete.
     """
@@ -2684,6 +2793,7 @@ async def trigger_recipe_action(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Trigger a recipe action against a specific recipe.
+
     Args:
         id: The ID of the recipe action to trigger.
         recipeSlug: The slug of the recipe to trigger the action on.
@@ -2702,6 +2812,7 @@ async def list_all_event_notifications(
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all event notification rules.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
@@ -2720,6 +2831,7 @@ async def get_event_notification_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a single event notification by ID.
+
     Args:
         id: The unique ID of the event notification.
         include_all_fields: Default False (common fields only). Set True for all fields.
@@ -2733,6 +2845,7 @@ async def create_event_notification(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a new event notification rule.
+
     Args:
         name: Name of the notification.
         enabled: true = enabled, false = disabled. Default: true.
@@ -2751,6 +2864,7 @@ async def update_event_notification(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update an existing event notification.
+
     Args:
         id: The ID of the event notification to update.
         name: New name.
@@ -2768,6 +2882,7 @@ async def delete_event_notification_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Delete an event notification by its ID.
+
     Args:
         id: The unique ID of the event notification to delete.
     """
@@ -2780,6 +2895,7 @@ async def test_event_notification(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Test an event notification by sending a test event.
+
     Args:
         id: The ID of the event notification to test.
     """
@@ -2797,6 +2913,7 @@ async def list_all_webhooks(
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all webhooks.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
@@ -2815,6 +2932,7 @@ async def get_webhook_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a single webhook by ID.
+
     Args:
         id: The unique ID of the webhook.
         include_all_fields: Default False (common fields only). Set True for all fields.
@@ -2829,6 +2947,7 @@ async def create_webhook(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a new webhook.
+
     Args:
         name: Name of the webhook.
         url: The URL to send webhook events to.
@@ -2849,6 +2968,7 @@ async def update_webhook(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update an existing webhook.
+
     Args:
         id: The ID of the webhook to update.
         name: New name.
@@ -2867,6 +2987,7 @@ async def delete_webhook_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Delete a webhook by its ID.
+
     Args:
         id: The unique ID of the webhook to delete.
     """
@@ -2879,6 +3000,7 @@ async def test_webhook(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Test a webhook by sending a test event.
+
     Args:
         id: The ID of the webhook to test.
     """
@@ -2901,6 +3023,7 @@ async def list_all_invitations(
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all household invitation tokens.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
     """
@@ -2915,6 +3038,7 @@ async def create_invitation(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a household invitation token.
+
     Args:
         uses: Maximum number of times the invitation can be used.
         groupId: Group ID to associate with the invitation.
@@ -2934,6 +3058,7 @@ async def email_invitation(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Email an invitation to a user.
+
     Args:
         email: The email address to send the invitation to.
         token: The invitation token to send.
@@ -2953,6 +3078,7 @@ async def get_user_profile(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get the currently logged-in user's profile.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
     """
@@ -2964,6 +3090,7 @@ async def list_user_ratings(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get all ratings from the currently logged-in user.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
     """
@@ -2976,6 +3103,7 @@ async def get_user_rating_for_recipe(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get the current user's rating for a specific recipe.
+
     Args:
         recipeId: The ID of the recipe.
     """
@@ -2987,6 +3115,7 @@ async def list_user_favorites(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get all favorite recipes from the currently logged-in user.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
     """
@@ -3000,6 +3129,7 @@ async def set_recipe_rating(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Set or update a rating for a recipe.
+
     Args:
         userId: The ID of the user.
         slug: The slug of the recipe.
@@ -3016,6 +3146,7 @@ async def add_recipe_favorite(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Add a recipe to the user's favorites.
+
     Args:
         userId: The ID of the user.
         slug: The slug of the recipe.
@@ -3031,6 +3162,7 @@ async def remove_recipe_favorite(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Remove a recipe from the user's favorites.
+
     Args:
         userId: The ID of the user.
         slug: The slug of the recipe.
@@ -3049,6 +3181,7 @@ async def get_group_info(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get the current user's group information.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
     """
@@ -3060,6 +3193,7 @@ async def list_group_members(
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all members of the current group.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
     """
@@ -3072,6 +3206,7 @@ async def get_group_member(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a specific group member by username or ID.
+
     Args:
         usernameOrId: The username or ID of the member.
     """
@@ -3090,6 +3225,7 @@ async def update_group_preferences(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update the current group's preferences.
+
     Args:
         privateGroup: true = private (hidden), false = public. Default: false.
     """
@@ -3110,6 +3246,7 @@ async def list_households(
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all households in the group.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
     """
@@ -3122,6 +3259,7 @@ async def get_household(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a specific household by its slug.
+
     Args:
         householdSlug: The slug of the household.
     """
@@ -3133,6 +3271,7 @@ async def get_household_info(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get the current user's household information.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
     """
@@ -3145,6 +3284,7 @@ async def get_household_recipe(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a recipe scoped to the current household.
+
     Args:
         recipeSlug: The slug of the recipe.
     """
@@ -3156,6 +3296,7 @@ async def list_household_members(
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all members of the current household.
+
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
     """
@@ -3181,6 +3322,7 @@ async def update_household_preferences(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update the current household's preferences.
+
     Args:
         privateHousehold: true = private (hidden), false = public. Default: false.
     """
@@ -3198,6 +3340,7 @@ async def set_household_permissions(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Set household permissions for a user.
+
     Args:
         userId: The ID of the user to set permissions for.
         canManage: true = manage members (add/remove/roles). Default: false.
@@ -3234,6 +3377,7 @@ async def create_user(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a new user via the admin API.
+
     Args:
         username: Username for the new user.
         fullName: Full display name of the user.
@@ -3261,6 +3405,7 @@ async def get_user_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a user by ID via the admin API.
+
     Args:
         userId: The UUID of the user to retrieve.
     """
@@ -3282,6 +3427,7 @@ async def update_user(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update an existing user via the admin API.
+
     Args:
         userId: The UUID of the user to update.
         username: Username for the user.
@@ -3312,6 +3458,7 @@ async def delete_user(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Delete a user by ID via the admin API.
+
     Args:
         userId: The UUID of the user to delete.
     """
@@ -3324,6 +3471,7 @@ async def list_users(
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all users via the admin API.
+
     Args:
         page: Page number for pagination. Default 1.
         perPage: Number of results per page. Default 50.
@@ -3340,6 +3488,7 @@ async def create_group(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a new group via the admin API.
+
     Args:
         name: Name of the group.
     """
@@ -3351,6 +3500,7 @@ async def get_group_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a group by ID via the admin API.
+
     Args:
         groupId: The UUID of the group to retrieve.
     """
@@ -3363,6 +3513,7 @@ async def update_group(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update an existing group via the admin API.
+
     Args:
         groupId: The UUID of the group to update.
         name: New name for the group.
@@ -3376,6 +3527,7 @@ async def delete_group(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Delete a group by ID via the admin API. Fails if group has users.
+
     Args:
         groupId: The UUID of the group to delete.
     """
@@ -3388,6 +3540,7 @@ async def list_groups(
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all groups via the admin API.
+
     Args:
         page: Page number for pagination. Default 1.
         perPage: Number of results per page. Default 50.
@@ -3405,6 +3558,7 @@ async def create_household(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a new household via the admin API.
+
     Args:
         name: Name of the household.
         groupId: Group UUID to assign the household to. Default None.
@@ -3419,6 +3573,7 @@ async def get_household_by_id(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a household by ID via the admin API.
+
     Args:
         householdId: The UUID of the household to retrieve.
     """
@@ -3432,6 +3587,7 @@ async def update_household(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update an existing household via the admin API.
+
     Args:
         householdId: The UUID of the household to update.
         name: New name for the household.
@@ -3446,6 +3602,7 @@ async def delete_household(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Delete a household by ID via the admin API. Fails if household has users.
+
     Args:
         householdId: The UUID of the household to delete.
     """
@@ -3458,6 +3615,7 @@ async def list_all_households(
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all households via the admin API.
+
     Args:
         page: Page number for pagination. Default 1.
         perPage: Number of results per page. Default 50.
@@ -3495,6 +3653,7 @@ async def parse_ingredient(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Parse a single ingredient string into structured data.
+
     Args:
         ingredient: The ingredient text to parse.
     """
@@ -3506,6 +3665,7 @@ async def parse_ingredients(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Parse multiple ingredient strings into structured data.
+
     Args:
         ingredients: List of ingredient strings to parse.
     """
@@ -3518,6 +3678,7 @@ async def seed_default_foods(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Seed default foods into the database.
+
     Args:
         locale: Locale for the seeded data (e.g. "en-US"). Defaults to "en-US".
     """
@@ -3529,6 +3690,7 @@ async def seed_default_labels(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Seed default labels into the database.
+
     Args:
         locale: Locale for the seeded data (e.g. "en-US"). Defaults to "en-US".
     """
@@ -3540,6 +3702,7 @@ async def seed_default_units(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Seed default units into the database.
+
     Args:
         locale: Locale for the seeded data (e.g. "en-US"). Defaults to "en-US".
     """
