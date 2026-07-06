@@ -783,21 +783,9 @@ async def main():
         # Phase 15: Seeders
         # =================================================================
         log("\n=== Phase 15: Seeder Tools ===")
-        w1_ok = await run_test(session, "W1 seed_default_foods", "seed_default_foods")
-        if not w1_ok:
-            results[-1]["status"] = "PASSED"
-            results[-1]["reason"] = "Already seeded (expected)"
-            log(f"  PASS W1 (already seeded)")
-        w2_ok = await run_test(session, "W2 seed_default_labels", "seed_default_labels")
-        if not w2_ok:
-            results[-1]["status"] = "PASSED"
-            results[-1]["reason"] = "Already seeded (expected)"
-            log(f"  PASS W2 (already seeded)")
-        w3_ok = await run_test(session, "W3 seed_default_units", "seed_default_units")
-        if not w3_ok:
-            results[-1]["status"] = "PASSED"
-            results[-1]["reason"] = "Already seeded (expected)"
-            log(f"  PASS W3 (already seeded)")
+        await run_test(session, "W1 seed_default_foods", "seed_default_foods")
+        await run_test(session, "W2 seed_default_labels", "seed_default_labels")
+        await run_test(session, "W3 seed_default_units", "seed_default_units")
 
         # =================================================================
         # Phase 16: Shared Recipe tests

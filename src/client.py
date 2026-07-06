@@ -1204,14 +1204,14 @@ class MealieClient:
     async def parse_ingredients(self, ingredients: list[str], api_key: Optional[str] = None) -> Any:
         return await self.post("/api/parser/ingredients", api_key, json={"ingredients": ingredients})
 
-    async def seed_default_foods(self, api_key: Optional[str] = None) -> Any:
-        return await self.post("/api/groups/seeders/foods", api_key, json={})
+    async def seed_default_foods(self, api_key: Optional[str] = None, locale: str = "en-US") -> Any:
+        return await self.post("/api/groups/seeders/foods", api_key, json={"locale": locale})
 
-    async def seed_default_labels(self, api_key: Optional[str] = None) -> Any:
-        return await self.post("/api/groups/seeders/labels", api_key, json={})
+    async def seed_default_labels(self, api_key: Optional[str] = None, locale: str = "en-US") -> Any:
+        return await self.post("/api/groups/seeders/labels", api_key, json={"locale": locale})
 
-    async def seed_default_units(self, api_key: Optional[str] = None) -> Any:
-        return await self.post("/api/groups/seeders/units", api_key, json={})
+    async def seed_default_units(self, api_key: Optional[str] = None, locale: str = "en-US") -> Any:
+        return await self.post("/api/groups/seeders/units", api_key, json={"locale": locale})
 
     async def get_app_about(self, api_key: Optional[str] = None) -> Any:
         return await self.get("/api/app/about", api_key)

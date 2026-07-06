@@ -3170,24 +3170,36 @@ async def parse_ingredients(
 
 @mcp.tool()
 async def seed_default_foods(
+    locale: str = "en-US",
     ctx: Context = None
 ) -> dict[str, Any]:
-    """Seed default foods into the database."""
-    return await get_client().seed_default_foods(get_user_token())
+    """Seed default foods into the database.
+    Args:
+        locale: Locale for the seeded data (e.g. "en-US"). Defaults to "en-US".
+    """
+    return await get_client().seed_default_foods(get_user_token(), locale=locale)
 
 @mcp.tool()
 async def seed_default_labels(
+    locale: str = "en-US",
     ctx: Context = None
 ) -> dict[str, Any]:
-    """Seed default labels into the database."""
-    return await get_client().seed_default_labels(get_user_token())
+    """Seed default labels into the database.
+    Args:
+        locale: Locale for the seeded data (e.g. "en-US"). Defaults to "en-US".
+    """
+    return await get_client().seed_default_labels(get_user_token(), locale=locale)
 
 @mcp.tool()
 async def seed_default_units(
+    locale: str = "en-US",
     ctx: Context = None
 ) -> dict[str, Any]:
-    """Seed default units into the database."""
-    return await get_client().seed_default_units(get_user_token())
+    """Seed default units into the database.
+    Args:
+        locale: Locale for the seeded data (e.g. "en-US"). Defaults to "en-US".
+    """
+    return await get_client().seed_default_units(get_user_token(), locale=locale)
 
 @mcp.tool()
 async def check_server_status(
