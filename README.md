@@ -30,6 +30,7 @@ with full CRUD, meal planning, recipe scraping, and bulk operations.
 | `MEALIE_BASE_URL` | Yes | Docker-internal URL of the Mealie server (e.g. `http://mealie-app:9000`). |
 | `MCP_SERVER_PORT` | Yes | Port number the MCP server listens on |
 | `ALLOW_ALL_AGGREGATE` | No | When `true`, aggregate listing tools honor the `include_all_fields` parameter. When `false` (default), the parameter is silently forced to `False` for aggregate list operations. |
+| `IS_STATEFUL` | No | When `true`, uses stateful Streamable HTTP with session tracking. When `false` (default), uses stateless mode. |
 | `MEALIE_PUBLIC_URL` | No | Public-facing URL of the Mealie server when served behind a reverse proxy (e.g. `https://mealie.example.com`). All URLs in API responses are rewritten to use this hostname instead of `MEALIE_BASE_URL`. Defaults to `MEALIE_BASE_URL`. |
 
 ## 📦 Installation & Local Development
