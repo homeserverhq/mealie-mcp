@@ -6,7 +6,7 @@ from contextvars import ContextVar
 from typing import Any, Optional
 
 from fastmcp import FastMCP, Context
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from toon_mcp import json_to_toon
 
 from .client import MealieClient
@@ -48,19 +48,21 @@ def get_user_token() -> Optional[str]:
 # =============================================================================
 
 class RecipeIngredientParam(BaseModel):
-    quantity: float = 0
-    unit: Optional[str] = None
-    food: Optional[str] = None
-    note: str = ""
-    display: str = ""
-    title: str = ""
-    originalText: str = ""
-    referenceId: Optional[str] = None
+    """Recipe ingredient. Can also be a plain string like '3 cups flour'."""
+    quantity: float = Field(default=0, description="Quantity of the ingredient.")
+    unit: Optional[str] = Field(default=None, description="Unit name (e.g. cup, gram).")
+    food: Optional[str] = Field(default=None, description="Food name (e.g. flour, butter).")
+    note: str = Field(default="", description="Additional note (e.g. sifted, room temperature).")
+    display: str = Field(default="", description="Full display text (e.g. 3 cups flour, sifted).")
+    title: str = Field(default="", description="Section title for grouping ingredients.")
+    originalText: str = Field(default="", description="Original text as parsed from the recipe.")
+    referenceId: Optional[str] = Field(default=None, description="Reference ID for linking to original source.")
 
 class RecipeInstructionParam(BaseModel):
-    text: str
-    title: str = ""
-    summary: str = ""
+    """Recipe instruction step."""
+    text: str = Field(description="Instruction text for this step.")
+    title: str = Field(default="", description="Title for this instruction step.")
+    summary: str = Field(default="", description="Short summary of this step.")
 
 class CreateRecipeParam(BaseModel):
     name: str
@@ -86,55 +88,55 @@ class CreateRecipeParam(BaseModel):
 
 class TagObjectInput(BaseModel):
     """Tag object for bulk tag operations. Slug is used to find existing tags; if not found, a new tag is created with the given name and slug. Duplicate slugs in the same request are collapsed."""
-    name: str
-    slug: str
+    name: str = Field(description="Tag name.")
+    slug: str = Field(description="Tag slug for lookup and creation.")
 
 class CategoryObjectInput(BaseModel):
     """Category object for bulk categorize operations. Slug is used to find existing categories; if not found, a new category is created with the given name and slug. Duplicate slugs in the same request are collapsed."""
-    name: str
-    slug: str
+    name: str = Field(description="Category name.")
+    slug: str = Field(description="Category slug for lookup and creation.")
 
 class BulkRecipeSettingsInput(BaseModel):
-    """Settings fields for bulk update. All fields optional — only provided fields are updated on each recipe."""
-    public: Optional[bool] = None
-    show_nutrition: Optional[bool] = None
-    show_assets: Optional[bool] = None
-    landscape_view: Optional[bool] = None
-    disable_comments: Optional[bool] = None
-    locked: Optional[bool] = None
+    """Settings fields for bulk update. All fields optional - only provided fields are updated on each recipe."""
+    public: Optional[bool] = Field(default=None, description="Whether the recipe is public.")
+    show_nutrition: Optional[bool] = Field(default=None, description="Show nutrition information.")
+    show_assets: Optional[bool] = Field(default=None, description="Show recipe assets.")
+    landscape_view: Optional[bool] = Field(default=None, description="Use landscape view.")
+    disable_comments: Optional[bool] = Field(default=None, description="Disable comments on the recipe.")
+    locked: Optional[bool] = Field(default=None, description="Lock the recipe from editing.")
 
 class ToolObjectInput(BaseModel):
     """Tool object for recipe operations. Slug is used to find existing tools; if not found, a new tool is created with the given name and slug. Duplicate slugs in the same request are collapsed."""
-    name: str
-    slug: str
+    name: str = Field(description="Tool name.")
+    slug: str = Field(description="Tool slug for lookup and creation.")
 
 class NutritionInput(BaseModel):
     """Nutrition information for a recipe. All fields optional."""
-    calories: Optional[str] = None
-    carbohydrateContent: Optional[str] = None
-    cholesterolContent: Optional[str] = None
-    fatContent: Optional[str] = None
-    fiberContent: Optional[str] = None
-    proteinContent: Optional[str] = None
-    saturatedFatContent: Optional[str] = None
-    sodiumContent: Optional[str] = None
-    sugarContent: Optional[str] = None
-    transFatContent: Optional[str] = None
-    unsaturatedFatContent: Optional[str] = None
+    calories: Optional[str] = Field(default=None, description="Calorie count.")
+    carbohydrateContent: Optional[str] = Field(default=None, description="Carbohydrate content.")
+    cholesterolContent: Optional[str] = Field(default=None, description="Cholesterol content.")
+    fatContent: Optional[str] = Field(default=None, description="Fat content.")
+    fiberContent: Optional[str] = Field(default=None, description="Fiber content.")
+    proteinContent: Optional[str] = Field(default=None, description="Protein content.")
+    saturatedFatContent: Optional[str] = Field(default=None, description="Saturated fat content.")
+    sodiumContent: Optional[str] = Field(default=None, description="Sodium content.")
+    sugarContent: Optional[str] = Field(default=None, description="Sugar content.")
+    transFatContent: Optional[str] = Field(default=None, description="Trans fat content.")
+    unsaturatedFatContent: Optional[str] = Field(default=None, description="Unsaturated fat content.")
 
 class RecipeSettingsParam(BaseModel):
     """Recipe settings. Only provided fields are updated."""
-    public: Optional[bool] = None
-    showNutrition: Optional[bool] = None
-    showAssets: Optional[bool] = None
-    landscapeView: Optional[bool] = None
-    disableComments: Optional[bool] = None
-    locked: Optional[bool] = None
+    public: Optional[bool] = Field(default=None, description="Whether the recipe is public.")
+    showNutrition: Optional[bool] = Field(default=None, description="Show nutrition information.")
+    showAssets: Optional[bool] = Field(default=None, description="Show recipe assets.")
+    landscapeView: Optional[bool] = Field(default=None, description="Use landscape view.")
+    disableComments: Optional[bool] = Field(default=None, description="Disable comments on the recipe.")
+    locked: Optional[bool] = Field(default=None, description="Lock the recipe from editing.")
 
 class RecipeNoteParam(BaseModel):
     """Recipe note."""
-    title: str = ""
-    text: str = ""
+    title: str = Field(default="", description="Title of the note.")
+    text: str = Field(default="", description="Text content of the note.")
 
 class UpdateRecipeParam(BaseModel):
     name: Optional[str] = None
@@ -230,12 +232,13 @@ class UpdateCookbookParam(BaseModel):
     queryFilterString: Optional[str] = None
 
 class CookbookUpdateItemParam(BaseModel):
-    id: str
-    name: Optional[str] = None
-    description: Optional[str] = None
-    position: Optional[int] = None
-    public: Optional[bool] = None
-    queryFilterString: Optional[str] = None
+    """Cookbook update item for bulk operations."""
+    id: str = Field(description="Cookbook UUID.")
+    name: Optional[str] = Field(default=None, description="New name for the cookbook.")
+    description: Optional[str] = Field(default=None, description="New description.")
+    position: Optional[int] = Field(default=None, description="New position/order in the list.")
+    public: Optional[bool] = Field(default=None, description="Whether the cookbook is public.")
+    queryFilterString: Optional[str] = Field(default=None, description="Query filter string for the cookbook.")
 
 class CreateMealplanParam(BaseModel):
     date: str
@@ -283,27 +286,29 @@ class UpdateShoppingItemParam(BaseModel):
     extras: Optional[dict] = None
 
 class BulkCreateShoppingItem(BaseModel):
-    shoppingListId: str
-    quantity: float = 0
-    note: str = ""
-    display: str = ""
-    checked: bool = False
-    position: int = 0
-    foodId: Optional[str] = None
-    labelId: Optional[str] = None
-    unitId: Optional[str] = None
+    """Shopping item for bulk creation."""
+    shoppingListId: str = Field(description="Shopping list UUID to add items to.")
+    quantity: float = Field(default=0, description="Quantity of the item.")
+    note: str = Field(default="", description="Note for the item.")
+    display: str = Field(default="", description="Display text for the item.")
+    checked: bool = Field(default=False, description="Whether the item is checked off.")
+    position: int = Field(default=0, description="Position in the shopping list.")
+    foodId: Optional[str] = Field(default=None, description="Food UUID to associate.")
+    labelId: Optional[str] = Field(default=None, description="Label UUID to associate.")
+    unitId: Optional[str] = Field(default=None, description="Unit UUID to associate.")
 
 class BulkUpdateShoppingItem(BaseModel):
-    id: str
-    shoppingListId: Optional[str] = None
-    quantity: Optional[float] = None
-    note: Optional[str] = None
-    display: Optional[str] = None
-    checked: Optional[bool] = None
-    position: Optional[int] = None
-    foodId: Optional[str] = None
-    labelId: Optional[str] = None
-    unitId: Optional[str] = None
+    """Shopping item for bulk update."""
+    id: str = Field(description="Shopping item UUID to update.")
+    shoppingListId: Optional[str] = Field(default=None, description="Shopping list UUID (required by Mealie API).")
+    quantity: Optional[float] = Field(default=None, description="New quantity.")
+    note: Optional[str] = Field(default=None, description="New note.")
+    display: Optional[str] = Field(default=None, description="New display text.")
+    checked: Optional[bool] = Field(default=None, description="New checked state.")
+    position: Optional[int] = Field(default=None, description="New position in the list.")
+    foodId: Optional[str] = Field(default=None, description="New food UUID.")
+    labelId: Optional[str] = Field(default=None, description="New label UUID.")
+    unitId: Optional[str] = Field(default=None, description="New unit UUID.")
 
 class CreateLabelParam(BaseModel):
     name: str
