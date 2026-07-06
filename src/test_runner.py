@@ -241,9 +241,9 @@ def _is_test_artifact(name: str, match_prefix: str | None = None) -> bool:
     if not name.startswith("t"):
         return False
     dash_pos = name.find("-", 1)
-    if dash_pos < 2 or dash_pos > 9:
+    if dash_pos != 9:
         return False
-    prefix = name[1:dash_pos]
+    prefix = name[1:9]
     if not prefix or not all(c in "0123456789abcdef" for c in prefix):
         return False
     if match_prefix is not None:
