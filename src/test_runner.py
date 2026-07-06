@@ -255,23 +255,23 @@ async def scan_artifacts(session: MCPSession, match_prefix: str | None = None) -
     """Scan all entity types for test artifacts. NO try/except — crashes on code bugs."""
     artifacts: list[dict] = []
     scans = [
-        ("recipe", "get_all_recipes", {"page": 1, "perPage": 200}, "slug", "name"),
-        ("tag", "get_all_tags", {"page": 1, "perPage": 200}, "id", "name"),
-        ("category", "get_all_categories", {"page": 1, "perPage": 200}, "id", "name"),
-        ("tool", "get_all_tools", {"page": 1, "perPage": 200}, "id", "name"),
-        ("food", "get_all_foods", {"page": 1, "perPage": 200}, "id", "name"),
-        ("unit", "get_all_units", {"page": 1, "perPage": 200}, "id", "name"),
-        ("cookbook", "get_all_cookbooks", {"page": 1, "perPage": 200}, "id", "name"),
-        ("label", "get_all_labels", {"page": 1, "perPage": 200}, "id", "name"),
-        ("shopping_list", "get_all_shopping_lists", {"page": 1, "perPage": 200}, "id", "name"),
-        ("shopping_item", "get_all_shopping_items", {"page": 1, "perPage": 200}, "id", "note"),
-        ("mealplan", "get_all_mealplans", {"page": 1, "perPage": 200}, "id", "title"),
-        ("mealplan_rule", "get_all_mealplan_rules", {"page": 1, "perPage": 200}, "id", "day"),
-        ("comment", "get_all_comments", {"page": 1, "perPage": 200}, "id", "text"),
-        ("recipe_action", "get_all_recipe_actions", {"page": 1, "perPage": 200}, "id", "title"),
-        ("event_notification", "get_all_event_notifications", {"page": 1, "perPage": 200}, "id", "name"),
-        ("webhook", "get_all_webhooks", {"page": 1, "perPage": 200}, "id", "name"),
-        ("timeline_event", "get_all_timeline_events", {"page": 1, "perPage": 200}, "id", "id"),
+        ("recipe", "list_all_recipes", {"page": 1, "perPage": 200}, "slug", "name"),
+        ("tag", "list_all_tags", {"page": 1, "perPage": 200}, "id", "name"),
+        ("category", "list_all_categories", {"page": 1, "perPage": 200}, "id", "name"),
+        ("tool", "list_all_tools", {"page": 1, "perPage": 200}, "id", "name"),
+        ("food", "list_all_foods", {"page": 1, "perPage": 200}, "id", "name"),
+        ("unit", "list_all_units", {"page": 1, "perPage": 200}, "id", "name"),
+        ("cookbook", "list_all_cookbooks", {"page": 1, "perPage": 200}, "id", "name"),
+        ("label", "list_all_labels", {"page": 1, "perPage": 200}, "id", "name"),
+        ("shopping_list", "list_all_shopping_lists", {"page": 1, "perPage": 200}, "id", "name"),
+        ("shopping_item", "list_all_shopping_items", {"page": 1, "perPage": 200}, "id", "note"),
+        ("mealplan", "list_all_mealplans", {"page": 1, "perPage": 200}, "id", "title"),
+        ("mealplan_rule", "list_all_mealplan_rules", {"page": 1, "perPage": 200}, "id", "day"),
+        ("comment", "list_all_comments", {"page": 1, "perPage": 200}, "id", "text"),
+        ("recipe_action", "list_all_recipe_actions", {"page": 1, "perPage": 200}, "id", "title"),
+        ("event_notification", "list_all_event_notifications", {"page": 1, "perPage": 200}, "id", "name"),
+        ("webhook", "list_all_webhooks", {"page": 1, "perPage": 200}, "id", "name"),
+        ("timeline_event", "list_all_timeline_events", {"page": 1, "perPage": 200}, "id", "id"),
         ("user", "list_users", {"page": 1, "perPage": 200}, "id", "username"),
         ("group", "list_groups", {"page": 1, "perPage": 200}, "id", "name"),
         ("household", "list_all_households", {"page": 1, "perPage": 200}, "id", "name"),
@@ -458,42 +458,42 @@ async def main():
         # Phase 3: List ALL Resources (get_all_*)
         # =================================================================
         log("\n=== Phase 3: List All Resources ===")
-        await run_test(session, "C1 all_recipes", "get_all_recipes")
-        await run_test(session, "C2 all_categories", "get_all_categories")
-        await run_test(session, "C3 all_tags", "get_all_tags")
-        await run_test(session, "C4 all_tools", "get_all_tools")
-        await run_test(session, "C5 all_foods", "get_all_foods")
-        await run_test(session, "C6 all_units", "get_all_units")
-        await run_test(session, "C7 all_comments", "get_all_comments")
-        await run_test(session, "C8 all_cookbooks", "get_all_cookbooks")
-        await run_test(session, "C9 all_mealplans", "get_all_mealplans")
-        await run_test(session, "C10 all_mealplan_rules", "get_all_mealplan_rules")
-        await run_test(session, "C11 all_shopping_lists", "get_all_shopping_lists")
-        await run_test(session, "C12 all_shopping_items", "get_all_shopping_items")
-        await run_test(session, "C13 all_labels", "get_all_labels")
-        await run_test(session, "C14 all_timeline_events", "get_all_timeline_events")
-        await run_test(session, "C15 all_shared_recipes", "get_all_shared_recipes")
-        await run_test(session, "C16 all_recipe_actions", "get_all_recipe_actions")
-        await run_test(session, "C17 all_event_notifications", "get_all_event_notifications")
-        await run_test(session, "C18 all_webhooks", "get_all_webhooks")
+        await run_test(session, "C1 all_recipes", "list_all_recipes")
+        await run_test(session, "C2 all_categories", "list_all_categories")
+        await run_test(session, "C3 all_tags", "list_all_tags")
+        await run_test(session, "C4 all_tools", "list_all_tools")
+        await run_test(session, "C5 all_foods", "list_all_foods")
+        await run_test(session, "C6 all_units", "list_all_units")
+        await run_test(session, "C7 all_comments", "list_all_comments")
+        await run_test(session, "C8 all_cookbooks", "list_all_cookbooks")
+        await run_test(session, "C9 all_mealplans", "list_all_mealplans")
+        await run_test(session, "C10 all_mealplan_rules", "list_all_mealplan_rules")
+        await run_test(session, "C11 all_shopping_lists", "list_all_shopping_lists")
+        await run_test(session, "C12 all_shopping_items", "list_all_shopping_items")
+        await run_test(session, "C13 all_labels", "list_all_labels")
+        await run_test(session, "C14 all_timeline_events", "list_all_timeline_events")
+        await run_test(session, "C15 all_shared_recipes", "list_all_shared_recipes")
+        await run_test(session, "C16 all_recipe_actions", "list_all_recipe_actions")
+        await run_test(session, "C17 all_event_notifications", "list_all_event_notifications")
+        await run_test(session, "C18 all_webhooks", "list_all_webhooks")
 
         # =================================================================
         # Phase 4: Empty / Summary / Special List Tools
         # =================================================================
         log("\n=== Phase 4: Empty & Summary Tools ===")
-        await run_test(session, "D1 get_empty_categories", "get_empty_categories")
-        await run_test(session, "D2 get_empty_tags", "get_empty_tags")
-        await run_test(session, "D3 get_recipe_suggestions", "get_recipe_suggestions")
-        await run_test(session, "D4 get_recipe_export_formats", "get_recipe_export_formats")
+        await run_test(session, "D1 list_empty_categories", "list_empty_categories")
+        await run_test(session, "D2 list_empty_tags", "list_empty_tags")
+        await run_test(session, "D3 list_recipe_suggestions", "list_recipe_suggestions")
+        await run_test(session, "D4 list_recipe_export_formats", "list_recipe_export_formats")
         await run_test(session, "D5 list_exports", "list_exports")
-        await run_test(session, "D6 get_todays_meals", "get_todays_meals")
+        await run_test(session, "D6 todays_meals", "list_todays_meals")
 
         # =================================================================
         # Phase 5: User Self-Service (ratings & favorites)
         # =================================================================
         log("\n=== Phase 5: User Self-Service ===")
-        await run_test(session, "E1 get_user_ratings", "get_user_ratings")
-        await run_test(session, "E2 get_user_favorites", "get_user_favorites")
+        await run_test(session, "E1 user_ratings", "list_user_ratings")
+        await run_test(session, "E2 user_favorites", "list_user_favorites")
 
         # =================================================================
         # Phase 6: Resource CRUD Cycle
@@ -719,7 +719,7 @@ async def main():
         # =================================================================
         log("\n=== Phase 9: Shopping List Operations ===")
         _q1_label_id = ""
-        _q1_r = await session.call_tool("get_all_labels", {"perPage": 50})
+        _q1_r = await session.call_tool("list_all_labels", {"perPage": 50})
         _q1_d = extract_content(_q1_r)
         _q1_items = get_list_items(_q1_d)
         _q1_label_id = _q1_items[0]["id"] if _q1_items else ""
@@ -769,7 +769,7 @@ async def main():
         # Phase 13: Invitations
         # =================================================================
         log("\n=== Phase 13: Invitations ===")
-        await run_test(session, "U1 get_all_invitations", "get_all_invitations")
+        await run_test(session, "U1 all_invitations", "list_all_invitations")
         await run_test_with_store(session, "U2 create_invitation", "create_invitation", {"uses": 5, "householdId": store["household_info"].get("id", "") if isinstance(store["household_info"], dict) else ""}, store_key="invitation")
         await run_test(session, "U3 email_invitation", "email_invitation", {"email": "test@example.com", "token": store["invitation"].get("token", "") if isinstance(store["invitation"], dict) else ""})
 
@@ -792,13 +792,13 @@ async def main():
         # Phase 16: Shared Recipe tests
         # =================================================================
         log("\n=== Phase 16: Shared Recipe Tools ===")
-        await run_test(session, "X1 get_all_shared_recipes", "get_all_shared_recipes")
+        await run_test(session, "X1 list_all_shared_recipes", "list_all_shared_recipes")
 
         # =================================================================
         # Phase 17: Timeline Event Coverage
         # =================================================================
         log("\n=== Phase 17: Timeline Event List ===")
-        await run_test(session, "Y1 get_all_timeline_events", "get_all_timeline_events")
+        await run_test(session, "Y1 list_all_timeline_events", "list_all_timeline_events")
 
         # =================================================================
         # Phase 18: Shopping Bulk Delete
@@ -1000,7 +1000,7 @@ async def main():
         await run_test(session, "Z6 cleanup_ingredient_recipe", "delete_recipe_by_slug", {"slug": pick_slug("ingredient_recipe") or "0"})
 
         # 2. Delete O19/O20 creamy-garlic-chicken recipes
-        _search = await session.call_tool("get_all_recipes", {"search": "creamy garlic", "perPage": 100})
+        _search = await session.call_tool("list_all_recipes", {"search": "creamy garlic", "perPage": 100})
         _cgc_data = extract_content(_search)
         _cgc_items = get_list_items(_cgc_data)
         for _cgc_item in _cgc_items:

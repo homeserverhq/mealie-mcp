@@ -470,7 +470,7 @@ def _normalize_enum(value: str, valid: set[str], param_name: str) -> str:
 # =============================================================================
 
 @mcp.tool()
-async def get_all_recipes(
+async def list_all_recipes(
     include_all_fields: bool = False,
     page: int = 1,
     perPage: int = 50,
@@ -917,7 +917,7 @@ async def bulk_update_recipe_settings(
     return await get_client().bulk_update_recipe_settings(recipes, settings_dict, get_user_token())
 
 @mcp.tool()
-async def get_recipe_suggestions(
+async def list_recipe_suggestions(
     include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
@@ -1012,7 +1012,7 @@ async def delete_recipe_image(
     return {"success": True, "message": "Recipe image deleted successfully"}
 
 @mcp.tool()
-async def get_recipe_export_formats(
+async def list_recipe_export_formats(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get available export formats and templates for recipes."""
@@ -1099,7 +1099,7 @@ async def purge_exports(
 # =============================================================================
 
 @mcp.tool()
-async def get_all_categories(
+async def list_all_categories(
     include_all_fields: bool = False,
     page: int = 1,
     perPage: int = 50,
@@ -1144,7 +1144,7 @@ async def get_category_by_slug(
     return await get_client().get_category_by_slug(slug, get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
-async def get_empty_categories(
+async def list_empty_categories(
     include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
@@ -1204,7 +1204,7 @@ async def delete_category_by_id(
 # =============================================================================
 
 @mcp.tool()
-async def get_all_tags(
+async def list_all_tags(
     include_all_fields: bool = False,
     page: int = 1,
     perPage: int = 50,
@@ -1249,7 +1249,7 @@ async def get_tag_by_slug(
     return await get_client().get_tag_by_slug(slug, get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
-async def get_empty_tags(
+async def list_empty_tags(
     include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
@@ -1309,7 +1309,7 @@ async def delete_tag_by_id(
 # =============================================================================
 
 @mcp.tool()
-async def get_all_tools(
+async def list_all_tools(
     include_all_fields: bool = False,
     page: int = 1,
     perPage: int = 50,
@@ -1402,7 +1402,7 @@ async def delete_tool_by_id(
 # =============================================================================
 
 @mcp.tool()
-async def get_all_foods(
+async def list_all_foods(
     include_all_fields: bool = False,
     page: int = 1,
     perPage: int = 50,
@@ -1511,7 +1511,7 @@ async def merge_foods(
 # =============================================================================
 
 @mcp.tool()
-async def get_all_units(
+async def list_all_units(
     include_all_fields: bool = False,
     page: int = 1,
     perPage: int = 50,
@@ -1640,7 +1640,7 @@ async def merge_units(
 # =============================================================================
 
 @mcp.tool()
-async def get_all_comments(
+async def list_all_comments(
     include_all_fields: bool = False,
     page: int = 1,
     perPage: int = 50,
@@ -1722,7 +1722,7 @@ async def delete_comment_by_id(
 # =============================================================================
 
 @mcp.tool()
-async def get_all_cookbooks(
+async def list_all_cookbooks(
     include_all_fields: bool = False,
     page: int = 1,
     perPage: int = 50,
@@ -1836,7 +1836,7 @@ async def update_cookbooks(
 # =============================================================================
 
 @mcp.tool()
-async def get_all_mealplans(
+async def list_all_mealplans(
     include_all_fields: bool = False,
     page: int = 1,
     perPage: int = 50,
@@ -1873,7 +1873,7 @@ async def get_mealplan_by_id(
     return await get_client().get_mealplan_by_id(str(id), get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
-async def get_todays_meals(
+async def list_todays_meals(
     include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
@@ -1969,7 +1969,7 @@ async def delete_mealplan_by_id(
 # =============================================================================
 
 @mcp.tool()
-async def get_all_mealplan_rules(
+async def list_all_mealplan_rules(
     include_all_fields: bool = False,
     page: int = 1,
     perPage: int = 50,
@@ -2063,7 +2063,7 @@ async def delete_mealplan_rule_by_id(
 # =============================================================================
 
 @mcp.tool()
-async def get_all_shopping_lists(
+async def list_all_shopping_lists(
     include_all_fields: bool = False,
     page: int = 1,
     perPage: int = 50,
@@ -2149,12 +2149,12 @@ async def update_shopping_list_label_settings(
     """Update label settings for a shopping list.
     Args:
         id: The ID of the shopping list.
-        labelId: The ID of an existing label to associate. Use get_all_labels() to find available labels.
+        labelId: The ID of an existing label to associate. Use list_all_labels() to find available labels.
         fontSize: Font size for labels. Defaults to 12.0.
         fontFamily: Font family for labels. Defaults to "Arial".
     """
     if not labelId:
-        return {"error": "labelId is required. Use get_all_labels() to find available labels."}
+        return {"error": "labelId is required. Use list_all_labels() to find available labels."}
     import uuid
     params = UpdateShoppingListLabelSettingsParam(
         id=str(uuid.uuid4()), shoppingListId=id, labelId=labelId, fontSize=fontSize, fontFamily=fontFamily
@@ -2192,7 +2192,7 @@ async def remove_recipe_from_shopping_list(
 # =============================================================================
 
 @mcp.tool()
-async def get_all_shopping_items(
+async def list_all_shopping_items(
     include_all_fields: bool = False,
     page: int = 1,
     perPage: int = 50,
@@ -2352,7 +2352,7 @@ async def bulk_delete_shopping_items(
 # =============================================================================
 
 @mcp.tool()
-async def get_all_labels(
+async def list_all_labels(
     include_all_fields: bool = False,
     page: int = 1,
     perPage: int = 50,
@@ -2436,7 +2436,7 @@ async def delete_label_by_id(
 # =============================================================================
 
 @mcp.tool()
-async def get_all_timeline_events(
+async def list_all_timeline_events(
     include_all_fields: bool = False,
     page: int = 1,
     perPage: int = 50,
@@ -2525,7 +2525,7 @@ async def delete_timeline_event_by_id(
 # =============================================================================
 
 @mcp.tool()
-async def get_all_shared_recipes(
+async def list_all_shared_recipes(
     include_all_fields: bool = False,
     recipeId: str = "",
     ctx: Context = None
@@ -2586,7 +2586,7 @@ async def delete_shared_recipe_by_id(
 # =============================================================================
 
 @mcp.tool()
-async def get_all_recipe_actions(
+async def list_all_recipe_actions(
     include_all_fields: bool = False,
     page: int = 1,
     perPage: int = 50,
@@ -2694,7 +2694,7 @@ async def trigger_recipe_action(
 # =============================================================================
 
 @mcp.tool()
-async def get_all_event_notifications(
+async def list_all_event_notifications(
     include_all_fields: bool = False,
     page: int = 1,
     perPage: int = 50,
@@ -2789,7 +2789,7 @@ async def test_event_notification(
 # =============================================================================
 
 @mcp.tool()
-async def get_all_webhooks(
+async def list_all_webhooks(
     include_all_fields: bool = False,
     page: int = 1,
     perPage: int = 50,
@@ -2895,7 +2895,7 @@ async def rerun_webhooks(
 # =============================================================================
 
 @mcp.tool()
-async def get_all_invitations(
+async def list_all_invitations(
     include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
@@ -2958,7 +2958,7 @@ async def get_user_profile(
     return await get_client().get_user_profile(get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
-async def get_user_ratings(
+async def list_user_ratings(
     include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
@@ -2981,7 +2981,7 @@ async def get_user_rating_for_recipe(
     return await get_client().get_user_rating_for_recipe(recipeId, get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
-async def get_user_favorites(
+async def list_user_favorites(
     include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
