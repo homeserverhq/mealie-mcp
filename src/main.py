@@ -122,6 +122,20 @@ class NutritionInput(BaseModel):
     transFatContent: Optional[str] = None
     unsaturatedFatContent: Optional[str] = None
 
+class RecipeSettingsParam(BaseModel):
+    """Recipe settings. Only provided fields are updated."""
+    public: Optional[bool] = None
+    showNutrition: Optional[bool] = None
+    showAssets: Optional[bool] = None
+    landscapeView: Optional[bool] = None
+    disableComments: Optional[bool] = None
+    locked: Optional[bool] = None
+
+class RecipeNoteParam(BaseModel):
+    """Recipe note."""
+    title: str = ""
+    text: str = ""
+
 class UpdateRecipeParam(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
@@ -166,13 +180,13 @@ class CreateFoodParam(BaseModel):
     name: str
     description: str = ""
     pluralName: str = ""
-    aliases: list = []
+    aliases: list[str] = []
 
 class UpdateFoodParam(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     pluralName: Optional[str] = None
-    aliases: Optional[list] = None
+    aliases: Optional[list[str]] = None
 
 class CreateUnitParam(BaseModel):
     name: str
@@ -182,7 +196,7 @@ class CreateUnitParam(BaseModel):
     description: str = ""
     fraction: bool = False
     useAbbreviation: bool = False
-    aliases: list = []
+    aliases: list[str] = []
 
 class UpdateUnitParam(BaseModel):
     name: Optional[str] = None
@@ -192,7 +206,7 @@ class UpdateUnitParam(BaseModel):
     description: Optional[str] = None
     fraction: Optional[bool] = None
     useAbbreviation: Optional[bool] = None
-    aliases: Optional[list] = None
+    aliases: Optional[list[str]] = None
 
 class CreateCommentParam(BaseModel):
     recipeId: str
@@ -376,7 +390,7 @@ async def get_all_recipes(
 ) -> dict[str, Any]:
     """List all recipes in your Mealie instance.
     Args:
-        include_all_fields: When False (default), each item contains only commonly used fields. Set to True to include all fields.
+        include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
         search: Search query to filter recipes by name or description.
@@ -400,8 +414,8 @@ async def get_recipe_by_slug(
 ) -> dict[str, Any]:
     """Get a single recipe by its slug.
     Args:
-        slug: The unique slug of the recipe (required).
-        include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
+        slug: The unique slug of the recipe.
+        include_all_fields: Default False (common fields only). Set True for all fields.
     """
     result = await get_client().get_recipe_by_slug(slug, get_user_token(), include_all_fields=include_all_fields)
     return _add_recipe_urls(result, get_client().public_hostname)
@@ -410,6 +424,8 @@ async def get_recipe_by_slug(
 def _format_ingredient(i) -> dict:
     if isinstance(i, str):
         return {"display": i, "note": i, "quantity": 0, "referenceId": str(uuid.uuid4())}
+    if hasattr(i, 'model_dump'):
+        i = i.model_dump()
     if isinstance(i, dict):
         ing = {k: v for k, v in i.items() if v is not None}
         ing.pop("unit", None)
@@ -567,18 +583,18 @@ async def create_recipe(
     recipeCategory: list[CategoryObjectInput] = [],
     tags: list[TagObjectInput] = [],
     tools: list[ToolObjectInput] = [],
-    recipeIngredient: list = [],
+    recipeIngredient: list[str | RecipeIngredientParam] = [],
     recipeInstructions: list[RecipeInstructionParam] = [],
     nutrition: Optional[NutritionInput] = None,
-    settings: dict = {},
-    notes: list = [],
+    settings: RecipeSettingsParam = None,
+    notes: list[RecipeNoteParam] = [],
     extras: dict = {},
     image: str = "",
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a new recipe.
     Args:
-        name: Name of the recipe (required).
+        name: Name of the recipe.
         description: Description of the recipe.
         recipeServings: Number of servings.
         totalTime: Total cooking time (e.g. "45 minutes", "1 hour 30 minutes").
@@ -630,8 +646,8 @@ async def create_recipe(
         "tags": [],
         "tools": [],
         "nutrition": nutrition.model_dump(exclude_none=True) if nutrition else {},
-        "settings": settings,
-        "notes": notes,
+        "settings": settings.model_dump(exclude_none=True) if settings else {},
+        "notes": [n.model_dump() for n in notes] if notes else [],
         "extras": extras,
         "image": image,
     })
@@ -694,18 +710,18 @@ async def update_recipe(
     recipeCategory: list[CategoryObjectInput] | None = None,
     tags: list[TagObjectInput] | None = None,
     tools: list[ToolObjectInput] | None = None,
-    recipeIngredient: list = None,
+    recipeIngredient: list[str | RecipeIngredientParam] | None = None,
     recipeInstructions: list[RecipeInstructionParam] = None,
     nutrition: Optional[NutritionInput] = None,
-    settings: dict = None,
-    notes: list = None,
+    settings: RecipeSettingsParam = None,
+    notes: list[RecipeNoteParam] | None = None,
     extras: dict = None,
     image: str = None,
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update an existing recipe.
     Args:
-        slug: The unique slug of the recipe to update (required).
+        slug: The unique slug of the recipe to update.
         name: Name of the recipe.
         description: Description of the recipe.
         recipeServings: Number of servings.
@@ -744,7 +760,7 @@ async def update_recipe(
         "totalTime": totalTime, "prepTime": prepTime, "cookTime": cookTime,
         "performTime": performTime, "recipeYield": recipeYield,
         "recipeYieldQuantity": recipeYieldQuantity, "orgURL": orgURL,
-        "nutrition": nutrition.model_dump(exclude_none=True) if nutrition else None, "settings": settings, "notes": notes,
+        "nutrition": nutrition.model_dump(exclude_none=True) if nutrition else None, "settings": settings.model_dump(exclude_none=True) if settings else None, "notes": [n.model_dump() for n in notes] if notes else None,
         "extras": extras, "image": image,
     }
     recipe.update({k: v for k, v in scalar_fields.items() if v is not None})
@@ -805,7 +821,7 @@ async def delete_recipe_by_slug(
 ) -> dict[str, Any]:
     """Delete a recipe by its slug.
     Args:
-        slug: The unique slug of the recipe to delete (required).
+        slug: The unique slug of the recipe to delete.
     """
     await get_client().delete_recipe_by_slug(slug, get_user_token())
     return {"success": True, "message": "Recipe deleted successfully"}
@@ -817,7 +833,7 @@ async def duplicate_recipe(
 ) -> dict[str, Any]:
     """Duplicate an existing recipe.
     Args:
-        slug: The slug of the recipe to duplicate (required).
+        slug: The slug of the recipe to duplicate.
     """
     return await get_client().duplicate_recipe(slug, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
@@ -828,7 +844,7 @@ async def update_recipe_last_made(
 ) -> dict[str, Any]:
     """Update the 'last made' timestamp for a recipe.
     Args:
-        slug: The slug of the recipe (required).
+        slug: The slug of the recipe.
     """
     return await get_client().update_recipe_last_made(slug, get_user_token())
 
@@ -840,7 +856,7 @@ async def bulk_update_recipe_settings(
 ) -> dict[str, Any]:
     """Bulk update settings for multiple recipes (partial update).
     Args:
-        recipes: List of recipe slugs (required).
+        recipes: List of recipe slugs.
         settings: Settings object with any subset of: public, show_nutrition, show_assets, landscape_view, disable_comments, locked. Only provided fields are updated on each recipe.
     """
     if not recipes or not settings:
@@ -857,7 +873,10 @@ async def get_recipe_suggestions(
     include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
-    """Get recipe suggestions based on available foods and tools."""
+    """Get recipe suggestions based on available foods and tools.
+    Args:
+        include_all_fields: Default False (common fields only). Set True for all fields.
+    """
     return await get_client().get_recipe_suggestions(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
 
 @mcp.tool()
@@ -869,7 +888,7 @@ async def create_recipe_from_url(
 ) -> dict[str, Any]:
     """Create a recipe by scraping a URL.
     Args:
-        url: The URL of the recipe to scrape (required).
+        url: The URL of the recipe to scrape.
         includeTags: Whether to include tags from the scraped data. Defaults to True.
         includeNutrition: Whether to include nutrition data. Defaults to False.
     """
@@ -887,7 +906,7 @@ async def create_recipe_from_url_bulk(
 ) -> dict[str, Any]:
     """Bulk create recipes by scraping multiple URLs.
     Args:
-        urls: List of recipe URLs to scrape (required).
+        urls: List of recipe URLs to scrape.
     """
     return await get_client().create_recipe_from_url_bulk(urls, get_user_token())
 
@@ -898,7 +917,7 @@ async def create_recipe_from_html_or_json(
 ) -> dict[str, Any]:
     """Create a recipe from raw HTML or JSON-LD data.
     Args:
-        data: HTML content or JSON-LD recipe data (required).
+        data: HTML content or JSON-LD recipe data.
     """
     result = await get_client().create_recipe_from_html_or_json(data, get_user_token())
     if isinstance(result, str):
@@ -912,7 +931,7 @@ async def test_scrape_url(
 ) -> dict[str, Any]:
     """Test-scrape a URL to see what data would be extracted (debug endpoint).
     Args:
-        url: The URL to test-scrape (required).
+        url: The URL to test-scrape.
     """
     result = await get_client().test_scrape_url(url, get_user_token())
     return {"result": result}
@@ -925,8 +944,8 @@ async def scrape_recipe_image_url(
 ) -> dict[str, Any]:
     """Scrape an image URL into a recipe.
     Args:
-        slug: The slug of the recipe (required).
-        url: The image URL to scrape (required).
+        slug: The slug of the recipe.
+        url: The image URL to scrape.
     """
     return await get_client().scrape_recipe_image_url(slug, url, get_user_token())
 
@@ -937,7 +956,7 @@ async def delete_recipe_image(
 ) -> dict[str, Any]:
     """Delete a recipe's image.
     Args:
-        slug: The slug of the recipe (required).
+        slug: The slug of the recipe.
     """
     await get_client().delete_recipe_image(slug, get_user_token())
     return {"success": True, "message": "Recipe image deleted successfully"}
@@ -956,7 +975,7 @@ async def export_recipe(
 ) -> dict[str, Any]:
     """Export a recipe in a specific format.
     Args:
-        slug: The slug of the recipe to export (required).
+        slug: The slug of the recipe to export.
     """
     return await get_client().export_recipe(slug, get_user_token())
 
@@ -968,7 +987,7 @@ async def bulk_tag_recipes(
 ) -> dict[str, Any]:
     """Bulk assign tags to recipes.
     Args:
-        recipes: List of recipe slugs to tag (required).
+        recipes: List of recipe slugs to tag.
         tags: List of TagObjectInput with name and slug. Slug is used to find existing tags; if not found, a new tag is created. Duplicate slugs are collapsed.
     """
     if not recipes or not tags:
@@ -985,7 +1004,7 @@ async def bulk_categorize_recipes(
 ) -> dict[str, Any]:
     """Bulk assign categories to recipes.
     Args:
-        recipes: List of recipe slugs to categorize (required).
+        recipes: List of recipe slugs to categorize.
         categories: List of CategoryObjectInput with name and slug. Slug is used to find existing categories; if not found, a new category is created. Duplicate slugs are collapsed.
     """
     if not recipes or not categories:
@@ -1001,7 +1020,7 @@ async def bulk_delete_recipes(
 ) -> dict[str, Any]:
     """Bulk delete recipes.
     Args:
-        recipes: List of recipe slugs to delete (required).
+        recipes: List of recipe slugs to delete.
     """
     await get_client().bulk_delete_recipes(recipes, get_user_token())
     return {"status": "deleted", "count": len(recipes)}
@@ -1011,7 +1030,10 @@ async def list_exports(
     include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
-    """List all bulk export data files."""
+    """List all bulk export data files.
+    Args:
+        include_all_fields: Default False (common fields only). Set True for all fields.
+    """
     data = await get_client().list_exports(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
     return {"exports": data if isinstance(data, list) else []}
 
@@ -1035,7 +1057,7 @@ async def get_all_categories(
 ) -> dict[str, Any]:
     """List all recipe categories.
     Args:
-        include_all_fields: When False (default), each item contains only commonly used fields. Set to True to include all fields.
+        include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
@@ -1053,8 +1075,8 @@ async def get_category_by_id(
 ) -> dict[str, Any]:
     """Get a single category by its ID.
     Args:
-        id: The unique ID of the category (required).
-        include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
+        id: The unique ID of the category.
+        include_all_fields: Default False (common fields only). Set True for all fields.
     """
     return await get_client().get_category_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
@@ -1066,8 +1088,8 @@ async def get_category_by_slug(
 ) -> dict[str, Any]:
     """Get a single category by its slug.
     Args:
-        slug: The unique slug of the category (required).
-        include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
+        slug: The unique slug of the category.
+        include_all_fields: Default False (common fields only). Set True for all fields.
     """
     return await get_client().get_category_by_slug(slug, get_user_token(), include_all_fields=include_all_fields)
 
@@ -1076,7 +1098,10 @@ async def get_empty_categories(
     include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
-    """List categories that have no associated recipes."""
+    """List categories that have no associated recipes.
+    Args:
+        include_all_fields: Default False (common fields only). Set True for all fields.
+    """
     data = await get_client().get_empty_categories(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
     return {"items": json_to_toon(data)}
 
@@ -1087,7 +1112,7 @@ async def create_category(
 ) -> dict[str, Any]:
     """Create a new category.
     Args:
-        name: Name of the category (required).
+        name: Name of the category.
     """
     params = CreateCategoryParam(name=name)
     return await get_client().create_category(
@@ -1103,7 +1128,7 @@ async def update_category(
 ) -> dict[str, Any]:
     """Update an existing category.
     Args:
-        id: The ID of the category to update (required).
+        id: The ID of the category to update.
         name: New name for the category.
     """
     params = UpdateCategoryParam(name=name)
@@ -1119,7 +1144,7 @@ async def delete_category_by_id(
 ) -> dict[str, Any]:
     """Delete a category by its ID.
     Args:
-        id: The unique ID of the category to delete (required).
+        id: The unique ID of the category to delete.
     """
     await get_client().delete_category_by_id(id, get_user_token())
     return {"success": True, "message": "Category deleted successfully"}
@@ -1137,7 +1162,7 @@ async def get_all_tags(
 ) -> dict[str, Any]:
     """List all recipe tags.
     Args:
-        include_all_fields: When False (default), each item contains only commonly used fields. Set to True to include all fields.
+        include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
@@ -1155,8 +1180,8 @@ async def get_tag_by_id(
 ) -> dict[str, Any]:
     """Get a single tag by its ID.
     Args:
-        id: The unique ID of the tag (required).
-        include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
+        id: The unique ID of the tag.
+        include_all_fields: Default False (common fields only). Set True for all fields.
     """
     return await get_client().get_tag_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
@@ -1168,8 +1193,8 @@ async def get_tag_by_slug(
 ) -> dict[str, Any]:
     """Get a single tag by its slug.
     Args:
-        slug: The unique slug of the tag (required).
-        include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
+        slug: The unique slug of the tag.
+        include_all_fields: Default False (common fields only). Set True for all fields.
     """
     return await get_client().get_tag_by_slug(slug, get_user_token(), include_all_fields=include_all_fields)
 
@@ -1178,7 +1203,10 @@ async def get_empty_tags(
     include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
-    """List tags that have no associated recipes."""
+    """List tags that have no associated recipes.
+    Args:
+        include_all_fields: Default False (common fields only). Set True for all fields.
+    """
     data = await get_client().get_empty_tags(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
     return {"items": json_to_toon(data)}
 
@@ -1189,7 +1217,7 @@ async def create_tag(
 ) -> dict[str, Any]:
     """Create a new tag.
     Args:
-        name: Name of the tag (required).
+        name: Name of the tag.
     """
     params = CreateTagParam(name=name)
     return await get_client().create_tag(
@@ -1205,7 +1233,7 @@ async def update_tag(
 ) -> dict[str, Any]:
     """Update an existing tag.
     Args:
-        id: The ID of the tag to update (required).
+        id: The ID of the tag to update.
         name: New name for the tag.
     """
     params = UpdateTagParam(name=name)
@@ -1221,7 +1249,7 @@ async def delete_tag_by_id(
 ) -> dict[str, Any]:
     """Delete a tag by its ID.
     Args:
-        id: The unique ID of the tag to delete (required).
+        id: The unique ID of the tag to delete.
     """
     await get_client().delete_tag_by_id(id, get_user_token())
     return {"success": True, "message": "Tag deleted successfully"}
@@ -1239,7 +1267,7 @@ async def get_all_tools(
 ) -> dict[str, Any]:
     """List all recipe tools.
     Args:
-        include_all_fields: When False (default), each item contains only commonly used fields. Set to True to include all fields.
+        include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
@@ -1257,8 +1285,8 @@ async def get_tool_by_id(
 ) -> dict[str, Any]:
     """Get a single tool by its ID.
     Args:
-        id: The unique ID of the tool (required).
-        include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
+        id: The unique ID of the tool.
+        include_all_fields: Default False (common fields only). Set True for all fields.
     """
     return await get_client().get_tool_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
@@ -1270,8 +1298,8 @@ async def get_tool_by_slug(
 ) -> dict[str, Any]:
     """Get a single tool by its slug.
     Args:
-        slug: The unique slug of the tool (required).
-        include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
+        slug: The unique slug of the tool.
+        include_all_fields: Default False (common fields only). Set True for all fields.
     """
     return await get_client().get_tool_by_slug(slug, get_user_token(), include_all_fields=include_all_fields)
 
@@ -1282,7 +1310,7 @@ async def create_tool(
 ) -> dict[str, Any]:
     """Create a new tool.
     Args:
-        name: Name of the tool (required).
+        name: Name of the tool.
     """
     params = CreateToolParam(name=name)
     return await get_client().create_tool(
@@ -1298,7 +1326,7 @@ async def update_tool(
 ) -> dict[str, Any]:
     """Update an existing tool.
     Args:
-        id: The ID of the tool to update (required).
+        id: The ID of the tool to update.
         name: New name for the tool.
     """
     params = UpdateToolParam(name=name)
@@ -1314,7 +1342,7 @@ async def delete_tool_by_id(
 ) -> dict[str, Any]:
     """Delete a tool by its ID.
     Args:
-        id: The unique ID of the tool to delete (required).
+        id: The unique ID of the tool to delete.
     """
     await get_client().delete_tool_by_id(id, get_user_token())
     return {"success": True, "message": "Tool deleted successfully"}
@@ -1332,7 +1360,7 @@ async def get_all_foods(
 ) -> dict[str, Any]:
     """List all ingredient foods.
     Args:
-        include_all_fields: When False (default), each item contains only commonly used fields. Set to True to include all fields.
+        include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
@@ -1350,8 +1378,8 @@ async def get_food_by_id(
 ) -> dict[str, Any]:
     """Get a single food by its ID.
     Args:
-        id: The unique ID of the food (required).
-        include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
+        id: The unique ID of the food.
+        include_all_fields: Default False (common fields only). Set True for all fields.
     """
     return await get_client().get_food_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
@@ -1365,7 +1393,7 @@ async def create_food(
 ) -> dict[str, Any]:
     """Create a new ingredient food.
     Args:
-        name: Name of the food (required).
+        name: Name of the food.
         description: Description of the food.
         pluralName: Plural name of the food.
         aliases: List of alias names for the food.
@@ -1389,7 +1417,7 @@ async def update_food(
 ) -> dict[str, Any]:
     """Update an existing food.
     Args:
-        id: The ID of the food to update (required).
+        id: The ID of the food to update.
         name: New name for the food.
         description: New description.
         pluralName: New plural name.
@@ -1410,7 +1438,7 @@ async def delete_food_by_id(
 ) -> dict[str, Any]:
     """Delete a food by its ID.
     Args:
-        id: The unique ID of the food to delete (required).
+        id: The unique ID of the food to delete.
     """
     await get_client().delete_food_by_id(id, get_user_token())
     return {"success": True, "message": "Food deleted successfully"}
@@ -1423,8 +1451,8 @@ async def merge_foods(
 ) -> dict[str, Any]:
     """Merge two foods together.
     Args:
-        food_to_keep: ID of the food to keep (required).
-        food_to_merge: ID of the food to merge into the kept food (required).
+        food_to_keep: ID of the food to keep.
+        food_to_merge: ID of the food to merge into the kept food.
     """
     return await get_client().merge_foods(food_to_keep, food_to_merge, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
@@ -1441,7 +1469,7 @@ async def get_all_units(
 ) -> dict[str, Any]:
     """List all ingredient units.
     Args:
-        include_all_fields: When False (default), each item contains only commonly used fields. Set to True to include all fields.
+        include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
@@ -1459,8 +1487,8 @@ async def get_unit_by_id(
 ) -> dict[str, Any]:
     """Get a single unit by its ID.
     Args:
-        id: The unique ID of the unit (required).
-        include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
+        id: The unique ID of the unit.
+        include_all_fields: Default False (common fields only). Set True for all fields.
     """
     return await get_client().get_unit_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
@@ -1478,7 +1506,7 @@ async def create_unit(
 ) -> dict[str, Any]:
     """Create a new ingredient unit.
     Args:
-        name: Name of the unit (required).
+        name: Name of the unit.
         abbreviation: Abbreviation for the unit.
         pluralName: Plural name of the unit.
         pluralAbbreviation: Plural abbreviation.
@@ -1512,7 +1540,7 @@ async def update_unit(
 ) -> dict[str, Any]:
     """Update an existing unit.
     Args:
-        id: The ID of the unit to update (required).
+        id: The ID of the unit to update.
         name: New name.
         abbreviation: New abbreviation.
         pluralName: New plural name.
@@ -1539,7 +1567,7 @@ async def delete_unit_by_id(
 ) -> dict[str, Any]:
     """Delete a unit by its ID.
     Args:
-        id: The unique ID of the unit to delete (required).
+        id: The unique ID of the unit to delete.
     """
     await get_client().delete_unit_by_id(id, get_user_token())
     return {"success": True, "message": "Unit deleted successfully"}
@@ -1552,8 +1580,8 @@ async def merge_units(
 ) -> dict[str, Any]:
     """Merge two units together.
     Args:
-        unit_to_keep: ID of the unit to keep (required).
-        unit_to_merge: ID of the unit to merge into the kept unit (required).
+        unit_to_keep: ID of the unit to keep.
+        unit_to_merge: ID of the unit to merge into the kept unit.
     """
     return await get_client().merge_units(unit_to_keep, unit_to_merge, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
@@ -1570,7 +1598,7 @@ async def get_all_comments(
 ) -> dict[str, Any]:
     """List all recipe comments.
     Args:
-        include_all_fields: When False (default), each item contains only commonly used fields. Set to True to include all fields.
+        include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
@@ -1588,8 +1616,8 @@ async def get_comment_by_id(
 ) -> dict[str, Any]:
     """Get a single comment by its ID.
     Args:
-        id: The unique ID of the comment (required).
-        include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
+        id: The unique ID of the comment.
+        include_all_fields: Default False (common fields only). Set True for all fields.
     """
     return await get_client().get_comment_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
@@ -1601,8 +1629,8 @@ async def create_comment(
 ) -> dict[str, Any]:
     """Create a new comment on a recipe.
     Args:
-        recipeId: The ID of the recipe to comment on (required).
-        text: The comment text (required).
+        recipeId: The ID of the recipe to comment on.
+        text: The comment text.
     """
     params = CreateCommentParam(recipeId=recipeId, text=text)
     return await get_client().create_comment(
@@ -1618,7 +1646,7 @@ async def update_comment(
 ) -> dict[str, Any]:
     """Update an existing comment.
     Args:
-        id: The ID of the comment to update (required).
+        id: The ID of the comment to update.
         text: New text for the comment.
     """
     params = UpdateCommentParam(text=text)
@@ -1634,7 +1662,7 @@ async def delete_comment_by_id(
 ) -> dict[str, Any]:
     """Delete a comment by its ID.
     Args:
-        id: The unique ID of the comment to delete (required).
+        id: The unique ID of the comment to delete.
     """
     await get_client().delete_comment_by_id(id, get_user_token())
     return {"success": True, "message": "Comment deleted successfully"}
@@ -1652,7 +1680,7 @@ async def get_all_cookbooks(
 ) -> dict[str, Any]:
     """List all cookbooks.
     Args:
-        include_all_fields: When False (default), each item contains only commonly used fields. Set to True to include all fields.
+        include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
@@ -1670,8 +1698,8 @@ async def get_cookbook_by_id(
 ) -> dict[str, Any]:
     """Get a single cookbook by its ID.
     Args:
-        id: The unique ID of the cookbook (required).
-        include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
+        id: The unique ID of the cookbook.
+        include_all_fields: Default False (common fields only). Set True for all fields.
     """
     return await get_client().get_cookbook_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
@@ -1686,7 +1714,7 @@ async def create_cookbook(
 ) -> dict[str, Any]:
     """Create a new cookbook.
     Args:
-        name: Name of the cookbook (required).
+        name: Name of the cookbook.
         description: Description of the cookbook.
         position: Display position. Defaults to 0.
         public: Whether the cookbook is public. Defaults to False.
@@ -1713,7 +1741,7 @@ async def update_cookbook(
 ) -> dict[str, Any]:
     """Update an existing cookbook.
     Args:
-        id: The ID of the cookbook to update (required).
+        id: The ID of the cookbook to update.
         name: New name.
         description: New description.
         position: New display position.
@@ -1736,7 +1764,7 @@ async def delete_cookbook_by_id(
 ) -> dict[str, Any]:
     """Delete a cookbook by its ID.
     Args:
-        id: The unique ID of the cookbook to delete (required).
+        id: The unique ID of the cookbook to delete.
     """
     await get_client().delete_cookbook_by_id(id, get_user_token())
     return {"success": True, "message": "Cookbook deleted successfully"}
@@ -1768,11 +1796,11 @@ async def get_all_mealplans(
 ) -> dict[str, Any]:
     """List all mealplan entries.
     Args:
-        include_all_fields: When False (default), each item contains only commonly used fields. Set to True to include all fields.
+        include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
-        startDate: Filter entries from this date (YYYY-MM-DD).
-        endDate: Filter entries until this date (YYYY-MM-DD).
+        startDate: Date only (YYYY-MM-DD).
+        endDate: Date only (YYYY-MM-DD).
     """
     data = await get_client().get_all_mealplans(
         get_user_token(), page=page, perPage=perPage,
@@ -1789,8 +1817,8 @@ async def get_mealplan_by_id(
 ) -> dict[str, Any]:
     """Get a single mealplan entry by its ID.
     Args:
-        id: The unique ID of the mealplan entry (required).
-        include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
+        id: The unique ID of the mealplan entry.
+        include_all_fields: Default False (common fields only). Set True for all fields.
     """
     return await get_client().get_mealplan_by_id(str(id), get_user_token(), include_all_fields=include_all_fields)
 
@@ -1799,7 +1827,10 @@ async def get_todays_meals(
     include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
-    """Get today's mealplans."""
+    """Get today's mealplans.
+    Args:
+        include_all_fields: Default False (common fields only). Set True for all fields.
+    """
     data = await get_client().get_todays_meals(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
     return {"meals": data if isinstance(data, list) else []}
 
@@ -1814,7 +1845,7 @@ async def create_mealplan(
 ) -> dict[str, Any]:
     """Create a new mealplan entry.
     Args:
-        date: Date of the mealplan entry (YYYY-MM-DD) (required).
+        date: Date only (YYYY-MM-DD).
         entryType: Type of meal (breakfast, lunch, dinner, side). Defaults to "dinner".
         title: Title of the mealplan entry.
         recipeId: ID of the associated recipe.
@@ -1838,7 +1869,7 @@ async def create_random_mealplan(
 ) -> dict[str, Any]:
     """Create a random mealplan entry using configured rules.
     Args:
-        date: Date for the mealplan entry (YYYY-MM-DD). Defaults to today.
+        date: Date only (YYYY-MM-DD). Defaults to today.
     """
     if not date:
         date = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d")
@@ -1856,8 +1887,8 @@ async def update_mealplan(
 ) -> dict[str, Any]:
     """Update an existing mealplan entry.
     Args:
-        id: The ID of the mealplan entry to update (required).
-        date: New date (YYYY-MM-DD).
+        id: The ID of the mealplan entry to update.
+        date: Date only (YYYY-MM-DD).
         entryType: New meal type (breakfast, lunch, dinner, side).
         title: New title.
         recipeId: New recipe ID.
@@ -1881,7 +1912,7 @@ async def delete_mealplan_by_id(
 ) -> dict[str, Any]:
     """Delete a mealplan entry by its ID.
     Args:
-        id: The unique ID of the mealplan entry to delete (required).
+        id: The unique ID of the mealplan entry to delete.
     """
     await get_client().delete_mealplan_by_id(str(id), get_user_token())
     return {"success": True, "message": "Mealplan deleted successfully"}
@@ -1899,7 +1930,7 @@ async def get_all_mealplan_rules(
 ) -> dict[str, Any]:
     """List all mealplan rules.
     Args:
-        include_all_fields: When False (default), each item contains only commonly used fields. Set to True to include all fields.
+        include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
@@ -1917,8 +1948,8 @@ async def get_mealplan_rule_by_id(
 ) -> dict[str, Any]:
     """Get a single mealplan rule by ID.
     Args:
-        id: The unique ID of the mealplan rule (required).
-        include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
+        id: The unique ID of the mealplan rule.
+        include_all_fields: Default False (common fields only). Set True for all fields.
     """
     return await get_client().get_mealplan_rule_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
@@ -1931,7 +1962,7 @@ async def create_mealplan_rule(
 ) -> dict[str, Any]:
     """Create a new mealplan rule.
     Args:
-        day: Day of the week (monday, tuesday, wednesday, thursday, friday, saturday, sunday) (required).
+        day: Day of the week (monday, tuesday, wednesday, thursday, friday, saturday, sunday).
         entryType: Type of meal (breakfast, lunch, dinner, side). Defaults to "dinner".
         queryFilterString: Filter string for recipe selection.
     """
@@ -1953,7 +1984,7 @@ async def update_mealplan_rule(
 ) -> dict[str, Any]:
     """Update an existing mealplan rule.
     Args:
-        id: The ID of the mealplan rule to update (required).
+        id: The ID of the mealplan rule to update.
         day: New day of the week (monday, tuesday, wednesday, thursday, friday, saturday, sunday).
         entryType: New meal type (breakfast, lunch, dinner, side).
         queryFilterString: New filter string.
@@ -1975,7 +2006,7 @@ async def delete_mealplan_rule_by_id(
 ) -> dict[str, Any]:
     """Delete a mealplan rule by its ID.
     Args:
-        id: The unique ID of the mealplan rule to delete (required).
+        id: The unique ID of the mealplan rule to delete.
     """
     await get_client().delete_mealplan_rule_by_id(id, get_user_token())
     return {"success": True, "message": "Mealplan rule deleted successfully"}
@@ -1993,7 +2024,7 @@ async def get_all_shopping_lists(
 ) -> dict[str, Any]:
     """List all shopping lists.
     Args:
-        include_all_fields: When False (default), each item contains only commonly used fields. Set to True to include all fields.
+        include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
@@ -2011,8 +2042,8 @@ async def get_shopping_list_by_id(
 ) -> dict[str, Any]:
     """Get a single shopping list by its ID.
     Args:
-        id: The unique ID of the shopping list (required).
-        include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
+        id: The unique ID of the shopping list.
+        include_all_fields: Default False (common fields only). Set True for all fields.
     """
     return await get_client().get_shopping_list_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
@@ -2024,7 +2055,7 @@ async def create_shopping_list(
 ) -> dict[str, Any]:
     """Create a new shopping list.
     Args:
-        name: Name of the shopping list (required).
+        name: Name of the shopping list.
         extras: Custom key-value pairs for extended data.
     """
     params = CreateShoppingListParam(name=name, extras=extras)
@@ -2042,7 +2073,7 @@ async def update_shopping_list(
 ) -> dict[str, Any]:
     """Update an existing shopping list.
     Args:
-        id: The ID of the shopping list to update (required).
+        id: The ID of the shopping list to update.
         name: New name.
         extras: New custom key-value pairs.
     """
@@ -2059,7 +2090,7 @@ async def delete_shopping_list_by_id(
 ) -> dict[str, Any]:
     """Delete a shopping list by its ID.
     Args:
-        id: The unique ID of the shopping list to delete (required).
+        id: The unique ID of the shopping list to delete.
     """
     await get_client().delete_shopping_list_by_id(id, get_user_token())
     return {"success": True, "message": "Shopping list deleted successfully"}
@@ -2074,8 +2105,8 @@ async def update_shopping_list_label_settings(
 ) -> dict[str, Any]:
     """Update label settings for a shopping list.
     Args:
-        id: The ID of the shopping list (required).
-        labelId: The ID of an existing label to associate (required). Use get_all_labels() to find available labels.
+        id: The ID of the shopping list.
+        labelId: The ID of an existing label to associate. Use get_all_labels() to find available labels.
         fontSize: Font size for labels. Defaults to 12.0.
         fontFamily: Font family for labels. Defaults to "Arial".
     """
@@ -2093,8 +2124,8 @@ async def add_recipe_to_shopping_list(
 ) -> dict[str, Any]:
     """Add recipe ingredients to a shopping list.
     Args:
-        id: The ID of the shopping list (required).
-        recipeId: The ID of the recipe whose ingredients to add (required).
+        id: The ID of the shopping list.
+        recipeId: The ID of the recipe whose ingredients to add.
     """
     return await get_client().add_recipe_to_shopping_list(id, recipeId, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
@@ -2106,8 +2137,8 @@ async def remove_recipe_from_shopping_list(
 ) -> dict[str, Any]:
     """Remove recipe ingredients from a shopping list.
     Args:
-        id: The ID of the shopping list (required).
-        recipeId: The ID of the recipe whose ingredients to remove (required).
+        id: The ID of the shopping list.
+        recipeId: The ID of the recipe whose ingredients to remove.
     """
     return await get_client().remove_recipe_from_shopping_list(id, recipeId, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
@@ -2124,7 +2155,7 @@ async def get_all_shopping_items(
 ) -> dict[str, Any]:
     """List all shopping list items.
     Args:
-        include_all_fields: When False (default), each item contains only commonly used fields. Set to True to include all fields.
+        include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
@@ -2142,8 +2173,8 @@ async def get_shopping_item_by_id(
 ) -> dict[str, Any]:
     """Get a single shopping list item by its ID.
     Args:
-        id: The unique ID of the shopping item (required).
-        include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
+        id: The unique ID of the shopping item.
+        include_all_fields: Default False (common fields only). Set True for all fields.
     """
     return await get_client().get_shopping_item_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
@@ -2163,7 +2194,7 @@ async def create_shopping_item(
 ) -> dict[str, Any]:
     """Create a new shopping list item.
     Args:
-        shoppingListId: The ID of the shopping list (required).
+        shoppingListId: The ID of the shopping list.
         quantity: Item quantity. Renders as leading number when > 0. Defaults to 0.
         note: Note describing the item.
         display: Display text for the item.
@@ -2203,7 +2234,7 @@ async def update_shopping_item(
 ) -> dict[str, Any]:
     """Update an existing shopping list item.
     Args:
-        id: The ID of the shopping item to update (required).
+        id: The ID of the shopping item to update.
         shoppingListId: The ID of the shopping list this item belongs to (required by Mealie API).
         quantity: New quantity.
         note: New note.
@@ -2235,7 +2266,7 @@ async def delete_shopping_item_by_id(
 ) -> dict[str, Any]:
     """Delete a shopping list item by its ID.
     Args:
-        id: The unique ID of the shopping item to delete (required).
+        id: The unique ID of the shopping item to delete.
     """
     await get_client().delete_shopping_item_by_id(id, get_user_token())
     return {"success": True, "message": "Shopping item deleted successfully"}
@@ -2287,7 +2318,7 @@ async def bulk_delete_shopping_items(
 ) -> dict[str, Any]:
     """Bulk delete shopping list items by IDs.
     Args:
-        ids: List of shopping item IDs to delete (required).
+        ids: List of shopping item IDs to delete.
     """
     return await get_client().bulk_delete_shopping_items(ids, get_user_token())
 
@@ -2304,7 +2335,7 @@ async def get_all_labels(
 ) -> dict[str, Any]:
     """List all multi-purpose labels.
     Args:
-        include_all_fields: When False (default), each item contains only commonly used fields. Set to True to include all fields.
+        include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
@@ -2322,8 +2353,8 @@ async def get_label_by_id(
 ) -> dict[str, Any]:
     """Get a single label by its ID.
     Args:
-        id: The unique ID of the label (required).
-        include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
+        id: The unique ID of the label.
+        include_all_fields: Default False (common fields only). Set True for all fields.
     """
     return await get_client().get_label_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
@@ -2335,7 +2366,7 @@ async def create_label(
 ) -> dict[str, Any]:
     """Create a new label.
     Args:
-        name: Name of the label (required).
+        name: Name of the label.
         color: Color hex code for the label.
     """
     params = CreateLabelParam(name=name, color=color)
@@ -2353,7 +2384,7 @@ async def update_label(
 ) -> dict[str, Any]:
     """Update an existing label.
     Args:
-        id: The ID of the label to update (required).
+        id: The ID of the label to update.
         name: New name.
         color: New color hex code.
     """
@@ -2370,7 +2401,7 @@ async def delete_label_by_id(
 ) -> dict[str, Any]:
     """Delete a label by its ID.
     Args:
-        id: The unique ID of the label to delete (required).
+        id: The unique ID of the label to delete.
     """
     await get_client().delete_label_by_id(id, get_user_token())
     return {"success": True, "message": "Label deleted successfully"}
@@ -2388,7 +2419,7 @@ async def get_all_timeline_events(
 ) -> dict[str, Any]:
     """List all recipe timeline events.
     Args:
-        include_all_fields: When False (default), each item contains only commonly used fields. Set to True to include all fields.
+        include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
@@ -2406,8 +2437,8 @@ async def get_timeline_event_by_id(
 ) -> dict[str, Any]:
     """Get a single timeline event by its ID.
     Args:
-        id: The unique ID of the timeline event (required).
-        include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
+        id: The unique ID of the timeline event.
+        include_all_fields: Default False (common fields only). Set True for all fields.
     """
     return await get_client().get_timeline_event_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
@@ -2420,8 +2451,8 @@ async def create_timeline_event(
 ) -> dict[str, Any]:
     """Create a new recipe timeline event.
     Args:
-        recipeId: The ID of the recipe (required).
-        eventType: Type of event (system, info, comment) (required).
+        recipeId: The ID of the recipe.
+        eventType: Type of event (system, info, comment).
         message: Event message text.
     """
     eventType = _normalize_enum(eventType, {"system", "info", "comment"}, "eventType")
@@ -2440,7 +2471,7 @@ async def update_timeline_event(
 ) -> dict[str, Any]:
     """Update an existing timeline event.
     Args:
-        id: The ID of the timeline event to update (required).
+        id: The ID of the timeline event to update.
         eventType: New event type (system, info, comment).
         message: New event message.
     """
@@ -2459,7 +2490,7 @@ async def delete_timeline_event_by_id(
 ) -> dict[str, Any]:
     """Delete a timeline event by its ID.
     Args:
-        id: The unique ID of the timeline event to delete (required).
+        id: The unique ID of the timeline event to delete.
     """
     await get_client().delete_timeline_event_by_id(id, get_user_token())
     return {"success": True, "message": "Timeline event deleted successfully"}
@@ -2476,7 +2507,7 @@ async def get_all_shared_recipes(
 ) -> dict[str, Any]:
     """List all shared recipe tokens.
     Args:
-        include_all_fields: When False (default), each item contains only commonly used fields. Set to True to include all fields.
+        include_all_fields: Default False (common fields only). Set True for all fields.
         recipeId: Filter by recipe ID.
     """
     data = await get_client().get_all_shared_recipes(
@@ -2493,8 +2524,8 @@ async def get_shared_recipe_by_id(
 ) -> dict[str, Any]:
     """Get a shared recipe by its public token ID.
     Args:
-        id: The public token ID of the shared recipe (required).
-        include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
+        id: The public token ID of the shared recipe.
+        include_all_fields: Default False (common fields only). Set True for all fields.
     """
     return await get_client().get_shared_recipe_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
@@ -2505,7 +2536,7 @@ async def create_shared_recipe(
 ) -> dict[str, Any]:
     """Create a share token for a recipe.
     Args:
-        recipeId: The ID of the recipe to share (required).
+        recipeId: The ID of the recipe to share.
     """
     params = CreateSharedRecipeParam(recipeId=recipeId)
     return await get_client().create_shared_recipe(
@@ -2520,7 +2551,7 @@ async def delete_shared_recipe_by_id(
 ) -> dict[str, Any]:
     """Delete a shared recipe token.
     Args:
-        id: The token ID of the shared recipe to delete (required).
+        id: The token ID of the shared recipe to delete.
     """
     await get_client().delete_shared_recipe_by_id(id, get_user_token())
     return {"success": True, "message": "Shared recipe deleted successfully"}
@@ -2538,7 +2569,7 @@ async def get_all_recipe_actions(
 ) -> dict[str, Any]:
     """List all recipe actions.
     Args:
-        include_all_fields: When False (default), each item contains only commonly used fields. Set to True to include all fields.
+        include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
@@ -2556,8 +2587,8 @@ async def get_recipe_action_by_id(
 ) -> dict[str, Any]:
     """Get a single recipe action by its ID.
     Args:
-        id: The unique ID of the recipe action (required).
-        include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
+        id: The unique ID of the recipe action.
+        include_all_fields: Default False (common fields only). Set True for all fields.
     """
     return await get_client().get_recipe_action_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
@@ -2571,10 +2602,10 @@ async def create_recipe_action(
 ) -> dict[str, Any]:
     """Create a new recipe action.
     Args:
-        name: Name of the action (required).
-        recipeActionType: Type of action (link, post) (required).
+        name: Name of the action.
+        recipeActionType: Type of action (link, post).
         description: Description of the action.
-        url: URL for the action (required for post type).
+        url: URL for the action.
     """
     recipeActionType = _normalize_enum(recipeActionType, {"link", "post"}, "recipeActionType")
     payload = {"name": name, "recipeActionType": recipeActionType, "description": description}
@@ -2595,7 +2626,7 @@ async def update_recipe_action(
 ) -> dict[str, Any]:
     """Update an existing recipe action.
     Args:
-        id: The ID of the recipe action to update (required).
+        id: The ID of the recipe action to update.
         name: New name.
         recipeActionType: New action type (link, post).
         description: New description.
@@ -2616,7 +2647,7 @@ async def delete_recipe_action_by_id(
 ) -> dict[str, Any]:
     """Delete a recipe action by its ID.
     Args:
-        id: The unique ID of the recipe action to delete (required).
+        id: The unique ID of the recipe action to delete.
     """
     await get_client().delete_recipe_action_by_id(id, get_user_token())
     return {"success": True, "message": "Recipe action deleted successfully"}
@@ -2629,8 +2660,8 @@ async def trigger_recipe_action(
 ) -> dict[str, Any]:
     """Trigger a recipe action against a specific recipe.
     Args:
-        id: The ID of the recipe action to trigger (required).
-        recipeSlug: The slug of the recipe to trigger the action on (required).
+        id: The ID of the recipe action to trigger.
+        recipeSlug: The slug of the recipe to trigger the action on.
     """
     return await get_client().trigger_recipe_action(id, recipeSlug, get_user_token())
 
@@ -2647,7 +2678,7 @@ async def get_all_event_notifications(
 ) -> dict[str, Any]:
     """List all event notification rules.
     Args:
-        include_all_fields: When False (default), each item contains only commonly used fields. Set to True to include all fields.
+        include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
@@ -2665,8 +2696,8 @@ async def get_event_notification_by_id(
 ) -> dict[str, Any]:
     """Get a single event notification by ID.
     Args:
-        id: The unique ID of the event notification (required).
-        include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
+        id: The unique ID of the event notification.
+        include_all_fields: Default False (common fields only). Set True for all fields.
     """
     return await get_client().get_event_notification_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
@@ -2678,7 +2709,7 @@ async def create_event_notification(
 ) -> dict[str, Any]:
     """Create a new event notification rule.
     Args:
-        name: Name of the notification (required).
+        name: Name of the notification.
         enabled: Whether the notification is enabled. Defaults to True.
     """
     params = CreateEventNotificationParam(name=name, enabled=enabled)
@@ -2696,7 +2727,7 @@ async def update_event_notification(
 ) -> dict[str, Any]:
     """Update an existing event notification.
     Args:
-        id: The ID of the event notification to update (required).
+        id: The ID of the event notification to update.
         name: New name.
         enabled: Whether the notification is enabled.
     """
@@ -2713,7 +2744,7 @@ async def delete_event_notification_by_id(
 ) -> dict[str, Any]:
     """Delete an event notification by its ID.
     Args:
-        id: The unique ID of the event notification to delete (required).
+        id: The unique ID of the event notification to delete.
     """
     await get_client().delete_event_notification_by_id(id, get_user_token())
     return {"success": True, "message": "Event notification deleted successfully"}
@@ -2725,7 +2756,7 @@ async def test_event_notification(
 ) -> dict[str, Any]:
     """Test an event notification by sending a test event.
     Args:
-        id: The ID of the event notification to test (required).
+        id: The ID of the event notification to test.
     """
     return await get_client().test_event_notification(id, get_user_token())
 
@@ -2742,7 +2773,7 @@ async def get_all_webhooks(
 ) -> dict[str, Any]:
     """List all webhooks.
     Args:
-        include_all_fields: When False (default), each item contains only commonly used fields. Set to True to include all fields.
+        include_all_fields: Default False (common fields only). Set True for all fields.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
@@ -2760,8 +2791,8 @@ async def get_webhook_by_id(
 ) -> dict[str, Any]:
     """Get a single webhook by ID.
     Args:
-        id: The unique ID of the webhook (required).
-        include_all_fields: When False (default), returns only commonly used fields. Set to True to retrieve all available fields.
+        id: The unique ID of the webhook.
+        include_all_fields: Default False (common fields only). Set True for all fields.
     """
     return await get_client().get_webhook_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
@@ -2774,8 +2805,8 @@ async def create_webhook(
 ) -> dict[str, Any]:
     """Create a new webhook.
     Args:
-        name: Name of the webhook (required).
-        url: The URL to send webhook events to (required).
+        name: Name of the webhook.
+        url: The URL to send webhook events to.
         enabled: Whether the webhook is enabled. Defaults to True.
     """
     params = CreateWebhookParam(name=name, url=url, enabled=enabled)
@@ -2794,7 +2825,7 @@ async def update_webhook(
 ) -> dict[str, Any]:
     """Update an existing webhook.
     Args:
-        id: The ID of the webhook to update (required).
+        id: The ID of the webhook to update.
         name: New name.
         url: New webhook URL.
         enabled: Whether the webhook is enabled.
@@ -2812,7 +2843,7 @@ async def delete_webhook_by_id(
 ) -> dict[str, Any]:
     """Delete a webhook by its ID.
     Args:
-        id: The unique ID of the webhook to delete (required).
+        id: The unique ID of the webhook to delete.
     """
     await get_client().delete_webhook_by_id(id, get_user_token())
     return {"success": True, "message": "Webhook deleted successfully"}
@@ -2824,7 +2855,7 @@ async def test_webhook(
 ) -> dict[str, Any]:
     """Test a webhook by sending a test event.
     Args:
-        id: The ID of the webhook to test (required).
+        id: The ID of the webhook to test.
     """
     return await get_client().test_webhook(id, get_user_token())
 
@@ -2844,7 +2875,10 @@ async def get_all_invitations(
     include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
-    """List all household invitation tokens."""
+    """List all household invitation tokens.
+    Args:
+        include_all_fields: Default False (common fields only). Set True for all fields.
+    """
     data = await get_client().get_all_invitations(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
     return {"invitations": data if isinstance(data, list) else []}
 
@@ -2857,7 +2891,7 @@ async def create_invitation(
 ) -> dict[str, Any]:
     """Create a household invitation token.
     Args:
-        uses: Maximum number of times the invitation can be used (required).
+        uses: Maximum number of times the invitation can be used.
         groupId: Group ID to associate with the invitation.
         householdId: Household ID to associate with the invitation.
     """
@@ -2875,8 +2909,8 @@ async def email_invitation(
 ) -> dict[str, Any]:
     """Email an invitation to a user.
     Args:
-        email: The email address to send the invitation to (required).
-        token: The invitation token to send (required).
+        email: The email address to send the invitation to.
+        token: The invitation token to send.
     """
     return await get_client().email_invitation(
         {"email": email, "token": token}, get_user_token()
@@ -2891,7 +2925,10 @@ async def get_user_profile(
     include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
-    """Get the currently logged-in user's profile."""
+    """Get the currently logged-in user's profile.
+    Args:
+        include_all_fields: Default False (common fields only). Set True for all fields.
+    """
     return await get_client().get_user_profile(get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
@@ -2899,7 +2936,10 @@ async def get_user_ratings(
     include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
-    """Get all ratings from the currently logged-in user."""
+    """Get all ratings from the currently logged-in user.
+    Args:
+        include_all_fields: Default False (common fields only). Set True for all fields.
+    """
     return await get_client().get_user_ratings(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
 
 @mcp.tool()
@@ -2910,7 +2950,7 @@ async def get_user_rating_for_recipe(
 ) -> dict[str, Any]:
     """Get the current user's rating for a specific recipe.
     Args:
-        recipeId: The ID of the recipe (required).
+        recipeId: The ID of the recipe.
     """
     return await get_client().get_user_rating_for_recipe(recipeId, get_user_token(), include_all_fields=include_all_fields)
 
@@ -2919,7 +2959,10 @@ async def get_user_favorites(
     include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
-    """Get all favorite recipes from the currently logged-in user."""
+    """Get all favorite recipes from the currently logged-in user.
+    Args:
+        include_all_fields: Default False (common fields only). Set True for all fields.
+    """
     return await get_client().get_user_favorites(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
 
 @mcp.tool()
@@ -2931,9 +2974,9 @@ async def set_recipe_rating(
 ) -> dict[str, Any]:
     """Set or update a rating for a recipe.
     Args:
-        userId: The ID of the user (required).
-        slug: The slug of the recipe (required).
-        rating: Rating value (1-5) (required).
+        userId: The ID of the user.
+        slug: The slug of the recipe.
+        rating: Rating value (1-5).
     """
     await get_client().set_recipe_rating(userId, slug, rating, get_user_token())
     return {"status": "rated", "slug": slug, "rating": rating}
@@ -2946,8 +2989,8 @@ async def add_recipe_favorite(
 ) -> dict[str, Any]:
     """Add a recipe to the user's favorites.
     Args:
-        userId: The ID of the user (required).
-        slug: The slug of the recipe (required).
+        userId: The ID of the user.
+        slug: The slug of the recipe.
     """
     await get_client().add_recipe_favorite(userId, slug, get_user_token())
     return {"status": "favorited", "slug": slug}
@@ -2960,8 +3003,8 @@ async def remove_recipe_favorite(
 ) -> dict[str, Any]:
     """Remove a recipe from the user's favorites.
     Args:
-        userId: The ID of the user (required).
-        slug: The slug of the recipe (required).
+        userId: The ID of the user.
+        slug: The slug of the recipe.
     """
     await get_client().remove_recipe_favorite(userId, slug, get_user_token())
     return {"status": "unfavorited", "slug": slug}
@@ -2975,7 +3018,10 @@ async def get_group_info(
     include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
-    """Get the current user's group information."""
+    """Get the current user's group information.
+    Args:
+        include_all_fields: Default False (common fields only). Set True for all fields.
+    """
     return await get_client().get_group_info(get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
@@ -2983,7 +3029,10 @@ async def list_group_members(
     include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
-    """List all members of the current group."""
+    """List all members of the current group.
+    Args:
+        include_all_fields: Default False (common fields only). Set True for all fields.
+    """
     return await get_client().list_group_members(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
 
 @mcp.tool()
@@ -2994,7 +3043,7 @@ async def get_group_member(
 ) -> dict[str, Any]:
     """Get a specific group member by username or ID.
     Args:
-        usernameOrId: The username or ID of the member (required).
+        usernameOrId: The username or ID of the member.
     """
     return await get_client().get_group_member(usernameOrId, get_user_token(), include_all_fields=include_all_fields)
 
@@ -3030,7 +3079,10 @@ async def list_households(
     include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
-    """List all households in the group."""
+    """List all households in the group.
+    Args:
+        include_all_fields: Default False (common fields only). Set True for all fields.
+    """
     return await get_client().list_households(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
 
 @mcp.tool()
@@ -3041,7 +3093,7 @@ async def get_household(
 ) -> dict[str, Any]:
     """Get a specific household by its slug.
     Args:
-        householdSlug: The slug of the household (required).
+        householdSlug: The slug of the household.
     """
     return await get_client().get_household(householdSlug, get_user_token(), include_all_fields=include_all_fields)
 
@@ -3050,7 +3102,10 @@ async def get_household_info(
     include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
-    """Get the current user's household information."""
+    """Get the current user's household information.
+    Args:
+        include_all_fields: Default False (common fields only). Set True for all fields.
+    """
     return await get_client().get_household_info(get_user_token(), include_all_fields=include_all_fields)
 
 @mcp.tool()
@@ -3061,7 +3116,7 @@ async def get_household_recipe(
 ) -> dict[str, Any]:
     """Get a recipe scoped to the current household.
     Args:
-        recipeSlug: The slug of the recipe (required).
+        recipeSlug: The slug of the recipe.
     """
     return await get_client().get_household_recipe(recipeSlug, get_user_token(), include_all_fields=include_all_fields)
 
@@ -3070,7 +3125,10 @@ async def list_household_members(
     include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
-    """List all members of the current household."""
+    """List all members of the current household.
+    Args:
+        include_all_fields: Default False (common fields only). Set True for all fields.
+    """
     return await get_client().list_household_members(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
 
 @mcp.tool()
@@ -3110,7 +3168,7 @@ async def set_household_permissions(
 ) -> dict[str, Any]:
     """Set household permissions for a user.
     Args:
-        userId: The ID of the user to set permissions for (required).
+        userId: The ID of the user to set permissions for.
         canManage: Whether the user can manage the household.
         canInvite: Whether the user can invite others.
         canOrganize: Whether the user can organize recipes.
@@ -3152,7 +3210,7 @@ async def parse_ingredient(
 ) -> dict[str, Any]:
     """Parse a single ingredient string into structured data.
     Args:
-        ingredient: The ingredient text to parse (required).
+        ingredient: The ingredient text to parse.
     """
     return await get_client().parse_ingredient(ingredient, get_user_token())
 
@@ -3163,7 +3221,7 @@ async def parse_ingredients(
 ) -> dict[str, Any]:
     """Parse multiple ingredient strings into structured data.
     Args:
-        ingredients: List of ingredient strings to parse (required).
+        ingredients: List of ingredient strings to parse.
     """
     data = await get_client().parse_ingredients(ingredients, get_user_token())
     return {"results": data} if isinstance(data, list) else data
