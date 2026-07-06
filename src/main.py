@@ -2391,7 +2391,7 @@ async def create_label(
     """Create a new label.
     Args:
         name: Name of the label.
-        color: Color hex code for the label.
+        color: Color hex code (e.g. '#FF5733').
     """
     params = CreateLabelParam(name=name, color=color)
     return await get_client().create_label(
@@ -2410,7 +2410,7 @@ async def update_label(
     Args:
         id: The ID of the label to update.
         name: New name.
-        color: New color hex code.
+        color: New color hex code (e.g. '#FF5733').
     """
     params = UpdateLabelParam(name=name, color=color)
     return await get_client().update_label(
