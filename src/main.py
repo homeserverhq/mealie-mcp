@@ -244,8 +244,8 @@ class CreateMealplanParam(BaseModel):
     date: str
     entryType: str = "dinner"
     title: str = ""
-    recipeId: str = ""
-    text: str = ""
+    recipeId: Optional[str] = None
+    text: Optional[str] = None
 
 class UpdateMealplanParam(BaseModel):
     date: Optional[str] = None
@@ -394,14 +394,61 @@ class UpdateUserParam(BaseModel):
     canManageHousehold: bool = Field(default=False, description="Whether the user can manage household settings.")
     canOrganize: bool = Field(default=False, description="Whether the user can organize tags/categories/foods.")
 
-class CreateGroupParam(BaseModel):
-    """Parameters for creating a new group via admin API."""
-    name: str = Field(description="Name of the group.")
-
 class UpdateGroupParam(BaseModel):
     """Parameters for updating an existing group via admin API."""
     id: str = Field(description="Group UUID to update.")
     name: str = Field(description="New name for the group.")
+
+class CreateRecipeFromUrlParam(BaseModel):
+    """Parameters for creating a recipe by scraping a URL."""
+    url: str = Field(description="The URL of the recipe to scrape.")
+    includeTags: bool = Field(default=True, description="Whether to include tags from the scraped data.")
+    includeNutrition: bool = Field(default=False, description="Whether to include nutrition data.")
+
+class UpdateShoppingListLabelSettingsParam(BaseModel):
+    """Parameters for updating label settings on a shopping list."""
+    id: str = Field(description="UUID for the label settings entry.")
+    shoppingListId: str = Field(description="Shopping list UUID.")
+    labelId: str = Field(description="Label UUID to associate.")
+    fontSize: float = Field(default=12.0, description="Font size for labels.")
+    fontFamily: str = Field(default="Arial", description="Font family for labels.")
+
+class SetRecipeRatingParam(BaseModel):
+    """Parameters for setting a recipe rating."""
+    userId: str = Field(description="User UUID.")
+    slug: str = Field(description="Recipe slug.")
+    rating: int = Field(description="Rating value (1-5).")
+
+class AddRecipeFavoriteParam(BaseModel):
+    """Parameters for adding a recipe to favorites."""
+    userId: str = Field(description="User UUID.")
+    slug: str = Field(description="Recipe slug.")
+
+class RemoveRecipeFavoriteParam(BaseModel):
+    """Parameters for removing a recipe from favorites."""
+    userId: str = Field(description="User UUID.")
+    slug: str = Field(description="Recipe slug.")
+
+class CreateRecipeActionParam(BaseModel):
+    """Parameters for creating a recipe action."""
+    name: str = Field(description="Name of the action.")
+    recipeActionType: str = Field(description="Type of action (link, post).")
+    description: str = Field(default="", description="Description of the action.")
+    url: str = Field(default="", description="URL for the action.")
+
+class UpdateRecipeActionParam(BaseModel):
+    """Parameters for updating a recipe action."""
+    name: Optional[str] = Field(default=None, description="New name.")
+    recipeActionType: Optional[str] = Field(default=None, description="New action type (link, post).")
+    description: Optional[str] = Field(default=None, description="New description.")
+
+class SetHouseholdPermissionsParam(BaseModel):
+    """Parameters for setting household permissions for a user."""
+    userId: str = Field(description="User UUID to set permissions for.")
+    canManage: bool = Field(default=False, description="Whether the user can manage the household.")
+    canManageHousehold: bool = Field(default=False, description="Whether the user can manage household preferences.")
+    canInvite: bool = Field(default=False, description="Whether the user can invite others.")
+    canOrganize: bool = Field(default=False, description="Whether the user can organize recipes.")
 
 class CreateHouseholdParam(BaseModel):
     """Parameters for creating a new household via admin API."""
@@ -671,7 +718,18 @@ async def create_recipe(
     prepTime = _str_or_pass(prepTime)
     cookTime = _str_or_pass(cookTime)
     performTime = _str_or_pass(performTime)
-    slug_raw = await get_client().create_recipe({"name": name}, get_user_token())
+    params = CreateRecipeParam(
+        name=name, description=description, recipeServings=recipeServings,
+        totalTime=totalTime, prepTime=prepTime, cookTime=cookTime, performTime=performTime,
+        recipeYield=recipeYield, recipeYieldQuantity=recipeYieldQuantity, orgURL=orgURL,
+        recipeCategory=recipeCategory, tags=tags, tools=tools,
+        recipeIngredient=recipeIngredient, recipeInstructions=recipeInstructions,
+        nutrition=nutrition.model_dump(exclude_none=True) if nutrition else {},
+        settings=settings.model_dump(exclude_none=True) if settings else {},
+        notes=[n.model_dump() for n in notes] if notes else [],
+        extras=extras, image=image
+    )
+    slug_raw = await get_client().create_recipe({"name": params.name}, get_user_token())
     slug = slug_raw if isinstance(slug_raw, str) else slug_raw.get("slug", "")
     if not slug:
         return {"error": "Failed to create recipe"}
@@ -680,39 +738,39 @@ async def create_recipe(
     if not isinstance(recipe, dict):
         return {"slug": slug, "status": "created"}
 
-    _orig_tags = tags
-    _orig_recipeCategory = recipeCategory
-    _orig_tools = tools
+    _orig_tags = params.tags
+    _orig_recipeCategory = params.recipeCategory
+    _orig_tools = params.tools
 
     recipe.update({
-        "description": description,
-        "recipeServings": recipeServings,
-        "totalTime": totalTime,
-        "prepTime": prepTime,
-        "cookTime": cookTime,
-        "performTime": performTime,
-        "recipeYield": recipeYield,
-        "recipeYieldQuantity": recipeYieldQuantity,
-        "orgURL": orgURL,
+        "description": params.description,
+        "recipeServings": params.recipeServings,
+        "totalTime": params.totalTime,
+        "prepTime": params.prepTime,
+        "cookTime": params.cookTime,
+        "performTime": params.performTime,
+        "recipeYield": params.recipeYield,
+        "recipeYieldQuantity": params.recipeYieldQuantity,
+        "orgURL": params.orgURL,
         "recipeCategory": [],
         "tags": [],
         "tools": [],
-        "nutrition": nutrition.model_dump(exclude_none=True) if nutrition else {},
-        "settings": settings.model_dump(exclude_none=True) if settings else {},
-        "notes": [n.model_dump() for n in notes] if notes else [],
-        "extras": extras,
-        "image": image,
+        "nutrition": params.nutrition,
+        "settings": params.settings,
+        "notes": params.notes,
+        "extras": params.extras,
+        "image": params.image,
     })
 
-    if recipeIngredient is not None:
+    if params.recipeIngredient is not None:
         recipe["recipeIngredient"] = [
             _format_ingredient(i)
-            for i in recipeIngredient
+            for i in params.recipeIngredient
         ]
-    if recipeInstructions is not None:
+    if params.recipeInstructions is not None:
         recipe["recipeInstructions"] = [
             {"id": None, **i.model_dump(exclude_none=True)}
-            for i in recipeInstructions
+            for i in params.recipeInstructions
         ]
 
     result = await get_client().update_recipe(
@@ -799,33 +857,44 @@ async def update_recipe(
     prepTime = _str_or_pass(prepTime)
     cookTime = _str_or_pass(cookTime)
     performTime = _str_or_pass(performTime)
+    params = UpdateRecipeParam(
+        name=name, description=description, recipeServings=recipeServings,
+        totalTime=totalTime, prepTime=prepTime, cookTime=cookTime, performTime=performTime,
+        recipeYield=recipeYield, recipeYieldQuantity=recipeYieldQuantity, orgURL=orgURL,
+        recipeCategory=recipeCategory, tags=tags, tools=tools,
+        recipeIngredient=recipeIngredient, recipeInstructions=recipeInstructions,
+        nutrition=nutrition.model_dump(exclude_none=True) if nutrition else None,
+        settings=settings.model_dump(exclude_none=True) if settings else None,
+        notes=[n.model_dump() for n in notes] if notes else None,
+        extras=extras, image=image
+    )
     recipe = await get_client().get_recipe_by_slug(slug, get_user_token(), include_all_fields=True)
     if not isinstance(recipe, dict):
         return {"slug": slug, "status": "not_found"}
 
-    _update_tags = tags
-    _update_recipeCategory = recipeCategory
-    _update_tools = tools
+    _update_tags = params.tags
+    _update_recipeCategory = params.recipeCategory
+    _update_tools = params.tools
 
     scalar_fields = {
-        "name": name, "description": description, "recipeServings": recipeServings,
-        "totalTime": totalTime, "prepTime": prepTime, "cookTime": cookTime,
-        "performTime": performTime, "recipeYield": recipeYield,
-        "recipeYieldQuantity": recipeYieldQuantity, "orgURL": orgURL,
-        "nutrition": nutrition.model_dump(exclude_none=True) if nutrition else None, "settings": settings.model_dump(exclude_none=True) if settings else None, "notes": [n.model_dump() for n in notes] if notes else None,
-        "extras": extras, "image": image,
+        "name": params.name, "description": params.description, "recipeServings": params.recipeServings,
+        "totalTime": params.totalTime, "prepTime": params.prepTime, "cookTime": params.cookTime,
+        "performTime": params.performTime, "recipeYield": params.recipeYield,
+        "recipeYieldQuantity": params.recipeYieldQuantity, "orgURL": params.orgURL,
+        "nutrition": params.nutrition, "settings": params.settings, "notes": params.notes,
+        "extras": params.extras, "image": params.image,
     }
     recipe.update({k: v for k, v in scalar_fields.items() if v is not None})
 
-    if recipeIngredient is not None:
+    if params.recipeIngredient is not None:
         recipe["recipeIngredient"] = [
             _format_ingredient(i)
-            for i in recipeIngredient
+            for i in params.recipeIngredient
         ]
-    if recipeInstructions is not None:
+    if params.recipeInstructions is not None:
         recipe["recipeInstructions"] = [
             {"id": None, **i.model_dump(exclude_none=True)}
-            for i in recipeInstructions
+            for i in params.recipeInstructions
         ]
 
     if _update_tags is not None:
@@ -944,8 +1013,9 @@ async def create_recipe_from_url(
         includeTags: Whether to include tags from the scraped data. Defaults to True.
         includeNutrition: Whether to include nutrition data. Defaults to False.
     """
+    params = CreateRecipeFromUrlParam(url=url, includeTags=includeTags, includeNutrition=includeNutrition)
     result = await get_client().create_recipe_from_url(
-        url, get_user_token(), includeTags=includeTags, includeNutrition=includeNutrition
+        params.url, get_user_token(), includeTags=params.includeTags, includeNutrition=params.includeNutrition
     )
     if isinstance(result, str):
         return {"slug": result}
@@ -1904,11 +1974,8 @@ async def create_mealplan(
         text: Additional text for the entry.
     """
     entryType = _normalize_enum(entryType, {"breakfast", "lunch", "dinner", "side"}, "entryType")
-    data = {"date": date, "entryType": entryType, "title": title}
-    if recipeId:
-        data["recipeId"] = recipeId
-    if text:
-        data["text"] = text
+    params = CreateMealplanParam(date=date, entryType=entryType, title=title, recipeId=recipeId or None, text=text or None)
+    data = params.model_dump(exclude_unset=True, exclude_none=True)
     return await get_client().create_mealplan(
         data, get_user_token(),
         include_all_fields=ALLOW_ALL_AGGREGATE
@@ -2165,8 +2232,10 @@ async def update_shopping_list_label_settings(
     if not labelId:
         return {"error": "labelId is required. Use get_all_labels() to find available labels."}
     import uuid
-    payload = {"id": str(uuid.uuid4()), "shoppingListId": id, "labelId": labelId, "fontSize": fontSize, "fontFamily": fontFamily}
-    return await get_client().update_shopping_list_label_settings(id, payload, get_user_token())
+    params = UpdateShoppingListLabelSettingsParam(
+        id=str(uuid.uuid4()), shoppingListId=id, labelId=labelId, fontSize=fontSize, fontFamily=fontFamily
+    )
+    return await get_client().update_shopping_list_label_settings(id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token())
 
 @mcp.tool()
 async def add_recipe_to_shopping_list(
@@ -2660,9 +2729,8 @@ async def create_recipe_action(
         url: URL for the action.
     """
     recipeActionType = _normalize_enum(recipeActionType, {"link", "post"}, "recipeActionType")
-    payload = {"name": name, "recipeActionType": recipeActionType, "description": description}
-    if url:
-        payload["url"] = url
+    params = CreateRecipeActionParam(name=name, recipeActionType=recipeActionType, description=description, url=url)
+    payload = params.model_dump(exclude_unset=True, exclude_none=True)
     return await get_client().create_recipe_action(
         payload, get_user_token(),
         include_all_fields=ALLOW_ALL_AGGREGATE
@@ -2685,9 +2753,9 @@ async def update_recipe_action(
     """
     if recipeActionType is not None:
         recipeActionType = _normalize_enum(recipeActionType, {"link", "post"}, "recipeActionType")
+    params = UpdateRecipeActionParam(name=name, recipeActionType=recipeActionType, description=description)
     return await get_client().update_recipe_action(
-        id, dict(filter(lambda x: x[1] is not None,
-            [("name", name), ("recipeActionType", recipeActionType), ("description", description)])),
+        id, params.model_dump(exclude_unset=True, exclude_none=True),
         get_user_token(),
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
@@ -2947,8 +3015,9 @@ async def create_invitation(
         groupId: Group ID to associate with the invitation.
         householdId: Household ID to associate with the invitation.
     """
+    params = CreateInvitationParam(uses=uses, groupId=groupId or None, householdId=householdId or None)
     return await get_client().create_invitation(
-        {"uses": uses, "groupId": groupId or None, "householdId": householdId or None},
+        params.model_dump(exclude_unset=True, exclude_none=True),
         get_user_token(),
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
@@ -2964,8 +3033,9 @@ async def email_invitation(
         email: The email address to send the invitation to.
         token: The invitation token to send.
     """
+    params = EmailInvitationParam(email=email, token=token)
     return await get_client().email_invitation(
-        {"email": email, "token": token}, get_user_token()
+        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
     )
 
 # =============================================================================
@@ -3030,7 +3100,8 @@ async def set_recipe_rating(
         slug: The slug of the recipe.
         rating: Rating value (1-5).
     """
-    await get_client().set_recipe_rating(userId, slug, rating, get_user_token())
+    params = SetRecipeRatingParam(userId=userId, slug=slug, rating=rating)
+    await get_client().set_recipe_rating(params.userId, params.slug, params.rating, get_user_token())
     return {"status": "rated", "slug": slug, "rating": rating}
 
 @mcp.tool()
@@ -3044,7 +3115,8 @@ async def add_recipe_favorite(
         userId: The ID of the user.
         slug: The slug of the recipe.
     """
-    await get_client().add_recipe_favorite(userId, slug, get_user_token())
+    params = AddRecipeFavoriteParam(userId=userId, slug=slug)
+    await get_client().add_recipe_favorite(params.userId, params.slug, get_user_token())
     return {"status": "favorited", "slug": slug}
 
 @mcp.tool()
@@ -3058,7 +3130,8 @@ async def remove_recipe_favorite(
         userId: The ID of the user.
         slug: The slug of the recipe.
     """
-    await get_client().remove_recipe_favorite(userId, slug, get_user_token())
+    params = RemoveRecipeFavoriteParam(userId=userId, slug=slug)
+    await get_client().remove_recipe_favorite(params.userId, params.slug, get_user_token())
     return {"status": "unfavorited", "slug": slug}
 
 # =============================================================================
@@ -3227,8 +3300,12 @@ async def set_household_permissions(
         canInvite: Whether the user can invite others.
         canOrganize: Whether the user can organize recipes.
     """
+    params = SetHouseholdPermissionsParam(
+        userId=userId, canManage=canManage, canManageHousehold=canManageHousehold,
+        canInvite=canInvite, canOrganize=canOrganize
+    )
     return await get_client().set_household_permissions(
-        {"userId": userId, "canManage": canManage, "canManageHousehold": canManageHousehold, "canInvite": canInvite, "canOrganize": canOrganize},
+        params.model_dump(exclude_unset=True, exclude_none=True),
         get_user_token()
     )
 
@@ -3265,15 +3342,12 @@ async def create_user(
         canManageHousehold: Whether the user can manage household settings. Default False.
         canOrganize: Whether the user can organize tags/categories/foods. Default False.
     """
-    payload = {
-        "username": username, "fullName": fullName, "email": email, "password": password,
-        "admin": admin, "canInvite": canInvite, "canManage": canManage,
-        "canManageHousehold": canManageHousehold, "canOrganize": canOrganize,
-    }
-    if group:
-        payload["group"] = group
-    if household:
-        payload["household"] = household
+    params = CreateUserParam(
+        username=username, fullName=fullName, email=email, password=password,
+        admin=admin, group=group, household=household,
+        canInvite=canInvite, canManage=canManage, canManageHousehold=canManageHousehold, canOrganize=canOrganize
+    )
+    payload = params.model_dump(exclude_unset=True, exclude_none=True)
     return await get_client().admin_create_user(payload, get_user_token())
 
 @mcp.tool()
@@ -3316,20 +3390,14 @@ async def update_user(
         canManageHousehold: Whether the user can manage household settings. Default False.
         canOrganize: Whether the user can organize tags/categories/foods. Default False.
     """
+    params = UpdateUserParam(
+        username=username, fullName=fullName, email=email, admin=admin,
+        group=group, household=household,
+        canInvite=canInvite, canManage=canManage, canManageHousehold=canManageHousehold, canOrganize=canOrganize
+    )
     current = await get_client().admin_get_user_raw(userId, get_user_token())
     payload = dict(current)
-    payload["username"] = username
-    payload["fullName"] = fullName
-    payload["email"] = email
-    payload["admin"] = admin
-    payload["canInvite"] = canInvite
-    payload["canManage"] = canManage
-    payload["canManageHousehold"] = canManageHousehold
-    payload["canOrganize"] = canOrganize
-    if group:
-        payload["group"] = group
-    if household:
-        payload["household"] = household
+    payload.update(params.model_dump(exclude_unset=True, exclude_none=True))
     payload["tokens"] = current.get("tokens") or []
     return await get_client().put_raw(f"/api/admin/users/{userId}", get_user_token(), json=payload)
 
@@ -3394,7 +3462,8 @@ async def update_group(
         groupId: The UUID of the group to update.
         name: New name for the group.
     """
-    return await get_client().admin_update_group(groupId, {"id": groupId, "name": name}, get_user_token())
+    params = UpdateGroupParam(id=groupId, name=name)
+    return await get_client().admin_update_group(groupId, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token())
 
 @mcp.tool()
 async def delete_group(
@@ -3435,9 +3504,8 @@ async def create_household(
         name: Name of the household.
         groupId: Group UUID to assign the household to. Default None.
     """
-    payload = {"name": name}
-    if groupId:
-        payload["groupId"] = groupId
+    params = CreateHouseholdParam(name=name, groupId=groupId)
+    payload = params.model_dump(exclude_unset=True, exclude_none=True)
     return await get_client().admin_create_household(payload, get_user_token())
 
 @mcp.tool()
@@ -3464,7 +3532,8 @@ async def update_household(
         name: New name for the household.
         groupId: Group UUID the household belongs to.
     """
-    return await get_client().admin_update_household(householdId, {"id": householdId, "name": name, "groupId": groupId}, get_user_token())
+    params = UpdateHouseholdParam(id=householdId, name=name, groupId=groupId)
+    return await get_client().admin_update_household(householdId, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token())
 
 @mcp.tool()
 async def delete_household(
