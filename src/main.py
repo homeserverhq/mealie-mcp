@@ -367,6 +367,53 @@ class UpdateWebhookParam(BaseModel):
     url: Optional[str] = None
     enabled: Optional[bool] = None
 
+class CreateUserParam(BaseModel):
+    """Parameters for creating a new user via admin API."""
+    username: str = Field(description="Username for the new user.")
+    fullName: str = Field(description="Full display name of the user.")
+    email: str = Field(description="Email address for the user.")
+    password: str = Field(description="Password for the user account.")
+    admin: bool = Field(default=False, description="Whether the user is an admin.")
+    group: Optional[str] = Field(default=None, description="Group name to assign the user to.")
+    household: Optional[str] = Field(default=None, description="Household name to assign the user to.")
+    canInvite: bool = Field(default=False, description="Whether the user can invite others.")
+    canManage: bool = Field(default=False, description="Whether the user can manage members.")
+    canManageHousehold: bool = Field(default=False, description="Whether the user can manage household settings.")
+    canOrganize: bool = Field(default=False, description="Whether the user can organize tags/categories/foods.")
+
+class UpdateUserParam(BaseModel):
+    """Parameters for updating an existing user via admin API."""
+    username: str = Field(description="Username for the user.")
+    fullName: str = Field(description="Full display name of the user.")
+    email: str = Field(description="Email address for the user.")
+    admin: bool = Field(default=False, description="Whether the user is an admin.")
+    group: Optional[str] = Field(default=None, description="Group name to assign the user to.")
+    household: Optional[str] = Field(default=None, description="Household name to assign the user to.")
+    canInvite: bool = Field(default=False, description="Whether the user can invite others.")
+    canManage: bool = Field(default=False, description="Whether the user can manage members.")
+    canManageHousehold: bool = Field(default=False, description="Whether the user can manage household settings.")
+    canOrganize: bool = Field(default=False, description="Whether the user can organize tags/categories/foods.")
+
+class CreateGroupParam(BaseModel):
+    """Parameters for creating a new group via admin API."""
+    name: str = Field(description="Name of the group.")
+
+class UpdateGroupParam(BaseModel):
+    """Parameters for updating an existing group via admin API."""
+    id: str = Field(description="Group UUID to update.")
+    name: str = Field(description="New name for the group.")
+
+class CreateHouseholdParam(BaseModel):
+    """Parameters for creating a new household via admin API."""
+    name: str = Field(description="Name of the household.")
+    groupId: Optional[str] = Field(default=None, description="Group UUID to assign the household to.")
+
+class UpdateHouseholdParam(BaseModel):
+    """Parameters for updating an existing household via admin API."""
+    id: str = Field(description="Household UUID to update.")
+    name: str = Field(description="New name for the household.")
+    groupId: str = Field(description="Group UUID the household belongs to.")
+
 def _str_or_pass(v):
     return str(v) if isinstance(v, int) else v
 
@@ -3167,6 +3214,7 @@ async def update_household_preferences(
 async def set_household_permissions(
     userId: str,
     canManage: bool = False,
+    canManageHousehold: bool = False,
     canInvite: bool = False,
     canOrganize: bool = False,
     ctx: Context = None
@@ -3175,13 +3223,272 @@ async def set_household_permissions(
     Args:
         userId: The ID of the user to set permissions for.
         canManage: Whether the user can manage the household.
+        canManageHousehold: Whether the user can manage household preferences.
         canInvite: Whether the user can invite others.
         canOrganize: Whether the user can organize recipes.
     """
     return await get_client().set_household_permissions(
-        {"userId": userId, "canManage": canManage, "canInvite": canInvite, "canOrganize": canOrganize},
+        {"userId": userId, "canManage": canManage, "canManageHousehold": canManageHousehold, "canInvite": canInvite, "canOrganize": canOrganize},
         get_user_token()
     )
+
+# =============================================================================
+# Admin User CRUD
+# =============================================================================
+
+@mcp.tool()
+async def create_user(
+    username: str,
+    fullName: str,
+    email: str,
+    password: str,
+    admin: bool = False,
+    group: str = None,
+    household: str = None,
+    canInvite: bool = False,
+    canManage: bool = False,
+    canManageHousehold: bool = False,
+    canOrganize: bool = False,
+    ctx: Context = None
+) -> dict[str, Any]:
+    """Create a new user via the admin API.
+    Args:
+        username: Username for the new user.
+        fullName: Full display name of the user.
+        email: Email address for the user.
+        password: Password for the user account.
+        admin: Whether the user is an admin. Default False.
+        group: Group name to assign the user to. Default None.
+        household: Household name to assign the user to. Default None.
+        canInvite: Whether the user can invite others. Default False.
+        canManage: Whether the user can manage members. Default False.
+        canManageHousehold: Whether the user can manage household settings. Default False.
+        canOrganize: Whether the user can organize tags/categories/foods. Default False.
+    """
+    payload = {
+        "username": username, "fullName": fullName, "email": email, "password": password,
+        "admin": admin, "canInvite": canInvite, "canManage": canManage,
+        "canManageHousehold": canManageHousehold, "canOrganize": canOrganize,
+    }
+    if group:
+        payload["group"] = group
+    if household:
+        payload["household"] = household
+    return await get_client().admin_create_user(payload, get_user_token())
+
+@mcp.tool()
+async def get_user_by_id(
+    userId: str,
+    ctx: Context = None
+) -> dict[str, Any]:
+    """Get a user by ID via the admin API.
+    Args:
+        userId: The UUID of the user to retrieve.
+    """
+    return await get_client().admin_get_user(userId, get_user_token())
+
+@mcp.tool()
+async def update_user(
+    userId: str,
+    username: str,
+    fullName: str,
+    email: str,
+    admin: bool = False,
+    group: str = None,
+    household: str = None,
+    canInvite: bool = False,
+    canManage: bool = False,
+    canManageHousehold: bool = False,
+    canOrganize: bool = False,
+    ctx: Context = None
+) -> dict[str, Any]:
+    """Update an existing user via the admin API.
+    Args:
+        userId: The UUID of the user to update.
+        username: Username for the user.
+        fullName: Full display name of the user.
+        email: Email address for the user.
+        admin: Whether the user is an admin. Default False.
+        group: Group name to assign the user to. Default None.
+        household: Household name to assign the user to. Default None.
+        canInvite: Whether the user can invite others. Default False.
+        canManage: Whether the user can manage members. Default False.
+        canManageHousehold: Whether the user can manage household settings. Default False.
+        canOrganize: Whether the user can organize tags/categories/foods. Default False.
+    """
+    current = await get_client().admin_get_user_raw(userId, get_user_token())
+    payload = dict(current)
+    payload["username"] = username
+    payload["fullName"] = fullName
+    payload["email"] = email
+    payload["admin"] = admin
+    payload["canInvite"] = canInvite
+    payload["canManage"] = canManage
+    payload["canManageHousehold"] = canManageHousehold
+    payload["canOrganize"] = canOrganize
+    if group:
+        payload["group"] = group
+    if household:
+        payload["household"] = household
+    payload["tokens"] = current.get("tokens") or []
+    return await get_client().put_raw(f"/api/admin/users/{userId}", get_user_token(), json=payload)
+
+@mcp.tool()
+async def delete_user(
+    userId: str,
+    ctx: Context = None
+) -> dict[str, Any]:
+    """Delete a user by ID via the admin API.
+    Args:
+        userId: The UUID of the user to delete.
+    """
+    return await get_client().admin_delete_user(userId, get_user_token())
+
+@mcp.tool()
+async def list_users(
+    page: int = 1,
+    perPage: int = 50,
+    ctx: Context = None
+) -> dict[str, Any]:
+    """List all users via the admin API.
+    Args:
+        page: Page number for pagination. Default 1.
+        perPage: Number of results per page. Default 50.
+    """
+    return await get_client().admin_list_users(page, perPage, get_user_token())
+
+# =============================================================================
+# Admin Group CRUD
+# =============================================================================
+
+@mcp.tool()
+async def create_group(
+    name: str,
+    ctx: Context = None
+) -> dict[str, Any]:
+    """Create a new group via the admin API.
+    Args:
+        name: Name of the group.
+    """
+    return await get_client().admin_create_group({"name": name}, get_user_token())
+
+@mcp.tool()
+async def get_group_by_id(
+    groupId: str,
+    ctx: Context = None
+) -> dict[str, Any]:
+    """Get a group by ID via the admin API.
+    Args:
+        groupId: The UUID of the group to retrieve.
+    """
+    return await get_client().admin_get_group(groupId, get_user_token())
+
+@mcp.tool()
+async def update_group(
+    groupId: str,
+    name: str,
+    ctx: Context = None
+) -> dict[str, Any]:
+    """Update an existing group via the admin API.
+    Args:
+        groupId: The UUID of the group to update.
+        name: New name for the group.
+    """
+    return await get_client().admin_update_group(groupId, {"id": groupId, "name": name}, get_user_token())
+
+@mcp.tool()
+async def delete_group(
+    groupId: str,
+    ctx: Context = None
+) -> dict[str, Any]:
+    """Delete a group by ID via the admin API. Fails if group has users.
+    Args:
+        groupId: The UUID of the group to delete.
+    """
+    return await get_client().admin_delete_group(groupId, get_user_token())
+
+@mcp.tool()
+async def list_groups(
+    page: int = 1,
+    perPage: int = 50,
+    ctx: Context = None
+) -> dict[str, Any]:
+    """List all groups via the admin API.
+    Args:
+        page: Page number for pagination. Default 1.
+        perPage: Number of results per page. Default 50.
+    """
+    return await get_client().admin_list_groups(page, perPage, get_user_token())
+
+# =============================================================================
+# Admin Household CRUD
+# =============================================================================
+
+@mcp.tool()
+async def create_household(
+    name: str,
+    groupId: str = None,
+    ctx: Context = None
+) -> dict[str, Any]:
+    """Create a new household via the admin API.
+    Args:
+        name: Name of the household.
+        groupId: Group UUID to assign the household to. Default None.
+    """
+    payload = {"name": name}
+    if groupId:
+        payload["groupId"] = groupId
+    return await get_client().admin_create_household(payload, get_user_token())
+
+@mcp.tool()
+async def get_household_by_id(
+    householdId: str,
+    ctx: Context = None
+) -> dict[str, Any]:
+    """Get a household by ID via the admin API.
+    Args:
+        householdId: The UUID of the household to retrieve.
+    """
+    return await get_client().admin_get_household(householdId, get_user_token())
+
+@mcp.tool()
+async def update_household(
+    householdId: str,
+    name: str,
+    groupId: str,
+    ctx: Context = None
+) -> dict[str, Any]:
+    """Update an existing household via the admin API.
+    Args:
+        householdId: The UUID of the household to update.
+        name: New name for the household.
+        groupId: Group UUID the household belongs to.
+    """
+    return await get_client().admin_update_household(householdId, {"id": householdId, "name": name, "groupId": groupId}, get_user_token())
+
+@mcp.tool()
+async def delete_household(
+    householdId: str,
+    ctx: Context = None
+) -> dict[str, Any]:
+    """Delete a household by ID via the admin API. Fails if household has users.
+    Args:
+        householdId: The UUID of the household to delete.
+    """
+    return await get_client().admin_delete_household(householdId, get_user_token())
+
+@mcp.tool()
+async def list_all_households(
+    page: int = 1,
+    perPage: int = 50,
+    ctx: Context = None
+) -> dict[str, Any]:
+    """List all households via the admin API.
+    Args:
+        page: Page number for pagination. Default 1.
+        perPage: Number of results per page. Default 50.
+    """
+    return await get_client().admin_list_households(page, perPage, get_user_token())
 
 @mcp.tool()
 async def get_app_about(

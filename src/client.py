@@ -124,14 +124,33 @@ class MealieClient:
                 return self._replace_base_urls(data)
             return {"text": response.text}
 
+    async def request_raw(self, method: str, path: str, api_key: Optional[str] = None, **kwargs: Any) -> Any:
+        """Raw request — no null stripping, no URL rewriting. For passing full objects back to the API."""
+        url = f"{self.base_url}{path}"
+        headers = self._get_headers(api_key)
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.request(method, url, headers=headers, **kwargs)
+            response.raise_for_status()
+            if response.status_code == 204:
+                return {}
+            if response.headers.get("content-type", "").startswith("application/json"):
+                return response.json() or {}
+            return {"text": response.text}
+
     async def get(self, path: str, api_key: Optional[str] = None, **kwargs: Any) -> Any:
         return await self.request("GET", path, api_key, **kwargs)
+
+    async def get_raw(self, path: str, api_key: Optional[str] = None, **kwargs: Any) -> Any:
+        return await self.request_raw("GET", path, api_key, **kwargs)
 
     async def post(self, path: str, api_key: Optional[str] = None, **kwargs: Any) -> Any:
         return await self.request("POST", path, api_key, **kwargs)
 
     async def put(self, path: str, api_key: Optional[str] = None, **kwargs: Any) -> Any:
         return await self.request("PUT", path, api_key, **kwargs)
+
+    async def put_raw(self, path: str, api_key: Optional[str] = None, **kwargs: Any) -> Any:
+        return await self.request_raw("PUT", path, api_key, **kwargs)
 
     async def delete(self, path: str, api_key: Optional[str] = None, **kwargs: Any) -> Any:
         return await self.request("DELETE", path, api_key, **kwargs)
@@ -1193,6 +1212,67 @@ class MealieClient:
 
     async def set_household_permissions(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
         return await self.put("/api/households/permissions", api_key, json=payload)
+
+    # =========================================================================
+    # Admin User CRUD
+    # =========================================================================
+
+    async def admin_create_user(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
+        return await self.post("/api/admin/users", api_key, json=payload)
+
+    async def admin_get_user(self, user_id: str, api_key: Optional[str] = None) -> Any:
+        return await self.get(f"/api/admin/users/{user_id}", api_key)
+
+    async def admin_get_user_raw(self, user_id: str, api_key: Optional[str] = None) -> Any:
+        """Get full raw user data — no stripping, no URL rewriting. For passing back to PUT."""
+        return await self.get_raw(f"/api/admin/users/{user_id}", api_key)
+
+    async def admin_update_user(self, user_id: str, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
+        return await self.put(f"/api/admin/users/{user_id}", api_key, json=payload)
+
+    async def admin_delete_user(self, user_id: str, api_key: Optional[str] = None) -> Any:
+        return await self.delete(f"/api/admin/users/{user_id}", api_key)
+
+    async def admin_list_users(self, page: int = 1, per_page: int = 50, api_key: Optional[str] = None) -> Any:
+        return await self.get("/api/admin/users", api_key, params={"page": page, "perPage": per_page})
+
+    # =========================================================================
+    # Admin Group CRUD
+    # =========================================================================
+
+    async def admin_create_group(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
+        return await self.post("/api/admin/groups", api_key, json=payload)
+
+    async def admin_get_group(self, group_id: str, api_key: Optional[str] = None) -> Any:
+        return await self.get(f"/api/admin/groups/{group_id}", api_key)
+
+    async def admin_update_group(self, group_id: str, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
+        return await self.put(f"/api/admin/groups/{group_id}", api_key, json=payload)
+
+    async def admin_delete_group(self, group_id: str, api_key: Optional[str] = None) -> Any:
+        return await self.delete(f"/api/admin/groups/{group_id}", api_key)
+
+    async def admin_list_groups(self, page: int = 1, per_page: int = 50, api_key: Optional[str] = None) -> Any:
+        return await self.get("/api/admin/groups", api_key, params={"page": page, "perPage": per_page})
+
+    # =========================================================================
+    # Admin Household CRUD
+    # =========================================================================
+
+    async def admin_create_household(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
+        return await self.post("/api/admin/households", api_key, json=payload)
+
+    async def admin_get_household(self, household_id: str, api_key: Optional[str] = None) -> Any:
+        return await self.get(f"/api/admin/households/{household_id}", api_key)
+
+    async def admin_update_household(self, household_id: str, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
+        return await self.put(f"/api/admin/households/{household_id}", api_key, json=payload)
+
+    async def admin_delete_household(self, household_id: str, api_key: Optional[str] = None) -> Any:
+        return await self.delete(f"/api/admin/households/{household_id}", api_key)
+
+    async def admin_list_households(self, page: int = 1, per_page: int = 50, api_key: Optional[str] = None) -> Any:
+        return await self.get("/api/admin/households", api_key, params={"page": page, "perPage": per_page})
 
     # =========================================================================
     # Domain Utilities

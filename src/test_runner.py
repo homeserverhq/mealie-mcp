@@ -272,6 +272,9 @@ async def scan_artifacts(session: MCPSession, match_prefix: str | None = None) -
         ("event_notification", "get_all_event_notifications", {"page": 1, "perPage": 200}, "id", "name"),
         ("webhook", "get_all_webhooks", {"page": 1, "perPage": 200}, "id", "name"),
         ("timeline_event", "get_all_timeline_events", {"page": 1, "perPage": 200}, "id", "id"),
+        ("user", "list_users", {"page": 1, "perPage": 200}, "id", "username"),
+        ("group", "list_groups", {"page": 1, "perPage": 200}, "id", "name"),
+        ("household", "list_all_households", {"page": 1, "perPage": 200}, "id", "name"),
     ]
     for entity_type, tool_name, params, id_key, name_key in scans:
         result = await session.call_tool(tool_name, params)
@@ -383,6 +386,7 @@ STORE_KEYS = [
     "image_test_recipe",
     "bulk_del_1", "bulk_del_2",
     "bulk_update_list",
+    "test_group", "test_household", "test_user",
 ]
 
 for k in STORE_KEYS:
@@ -447,12 +451,9 @@ async def main():
         await run_test(session, "B12 get_household_preferences", "get_household_preferences")
         await run_test(session, "B13 update_household_preferences", "update_household_preferences", {"privateHousehold": False})
         await run_test(session, "B14 get_household_statistics", "get_household_statistics")
-        b15_ok = await run_test(session, "B15 set_household_permissions", "set_household_permissions", {"userId": pick_id("user_profile"), "canManage": False, "canInvite": False, "canOrganize": False})
-        if not b15_ok:
-            results[-1]["status"] = "PASSED"
-            results[-1]["reason"] = "403 Forbidden (expected for integration user)"
-            log(f"  PASS B15 (expected 403)")
 
+        # =================================================================
+        # Phase 3: List All Resources
         # =================================================================
         # Phase 3: List ALL Resources (get_all_*)
         # =================================================================
@@ -931,6 +932,63 @@ async def main():
         await run_test(session, "AC1 purge_exports", "purge_exports")
 
         # =================================================================
+        # Phase 22: User/Group/Household Admin CRUD
+        # =================================================================
+        log("\n=== Phase 22: User/Group/Household Admin CRUD ===")
+
+        # Group CRUD — create first, rename AFTER user/household creation
+        await run_test_with_store(session, "BB1 create_group", "create_group", {"name": make_name("TestGroup")}, store_key="test_group")
+        await run_test(session, "BB2 get_group_by_id", "get_group_by_id", {"groupId": pick_id("test_group") or "0"})
+
+        # Household CRUD — create in test group BEFORE rename
+        await run_test_with_store(session, "BB6 create_household", "create_household", {"name": make_name("TestHousehold"), "groupId": pick_id("test_group") or None}, store_key="test_household")
+        await run_test(session, "BB7 get_household_by_id", "get_household_by_id", {"householdId": pick_id("test_household") or "0"})
+
+        # User CRUD — create in MCP user's default household (set_household_permissions requires same household)
+        await run_test_with_store(session, "BB11 create_user", "create_user", {"username": make_name("testuser"), "fullName": "Test User", "email": f"{make_name('testuser')}@test.local", "password": "testpass123"}, store_key="test_user")
+        await run_test(session, "BB12 get_user_by_id", "get_user_by_id", {"userId": pick_id("test_user") or "0"})
+
+        # Set permissions on test user (not self!)
+        await run_test(session, "BB16 set_household_permissions", "set_household_permissions", {"userId": pick_id("test_user") or "0", "canManage": True, "canManageHousehold": True, "canInvite": True, "canOrganize": True})
+
+        # Now rename group — user already created with original name
+        await run_test(session, "BB3 update_group", "update_group", {"groupId": pick_id("test_group") or "0", "name": make_name("RenamedGroup")})
+        await run_test(session, "BB4 get_group_by_id", "get_group_by_id", {"groupId": pick_id("test_group") or "0"})
+
+        # Now rename household — user already created with original name
+        await run_test(session, "BB8 update_household", "update_household", {"householdId": pick_id("test_household") or "0", "name": make_name("RenamedHousehold"), "groupId": pick_id("test_group") or "0"})
+        await run_test(session, "BB9 get_household_by_id", "get_household_by_id", {"householdId": pick_id("test_household") or "0"})
+
+        # Update user — rename
+        await run_test(session, "BB13 update_user", "update_user", {"userId": pick_id("test_user") or "0", "username": make_name("renameduser"), "fullName": "Renamed User", "email": f"{make_name('renameduser')}@test.local", "canManage": True, "canInvite": True, "canOrganize": True})
+        await run_test(session, "BB14 get_user_by_id", "get_user_by_id", {"userId": pick_id("test_user") or "0"})
+
+        # List operations
+        await run_test(session, "BB5 list_groups", "list_groups")
+        await run_test(session, "BB10 list_all_households", "list_all_households")
+        await run_test(session, "BB15 list_users", "list_users")
+
+        # Delete user first (group/household deletion requires no users)
+        await run_test(session, "BB17 delete_user", "delete_user", {"userId": pick_id("test_user") or "0"})
+        await verify_deleted(session, "BB18 verify_delete_user", "get_user_by_id", {"userId": pick_id("test_user") or "0"})
+
+        # Delete household (group deletion requires no households)
+        await run_test(session, "BB19 delete_household", "delete_household", {"householdId": pick_id("test_household") or "0"})
+        await verify_deleted(session, "BB20 verify_delete_household", "get_household_by_id", {"householdId": pick_id("test_household") or "0"})
+
+        # Delete any remaining households in the group (Mealie auto-creates a "Family" household)
+        _g_hh_data = await session.call_tool("list_all_households", {"page": 1, "perPage": 200})
+        _g_hh_items = get_list_items(extract_content(_g_hh_data))
+        _gid = pick_id("test_group")
+        for _hh in _g_hh_items:
+            if isinstance(_hh, dict) and _hh.get("groupId") == _gid:
+                await run_test(session, f"BB20b cleanup_hh_{_hh['id'][:8]}", "delete_household", {"householdId": _hh["id"]})
+
+        # Delete group last
+        await run_test(session, "BB21 delete_group", "delete_group", {"groupId": pick_id("test_group") or "0"})
+        await verify_deleted(session, "BB22 verify_delete_group", "get_group_by_id", {"groupId": pick_id("test_group") or "0"})
+
+        # =================================================================
         # Phase 19: Cleanup
         # =================================================================
         log("\n=== Phase 19: Cleanup ===")
@@ -969,6 +1027,9 @@ async def main():
             "webhook": ("delete_webhook_by_id", "id"),
             "timeline_event": ("delete_timeline_event_by_id", "id"),
             "label": ("delete_label_by_id", "id"),
+            "user": ("delete_user", "id"),
+            "group": ("delete_group", "id"),
+            "household": ("delete_household", "id"),
         }
         for _artifact in _remaining:
             _entry = _delete_tool_map.get(_artifact["type"])
