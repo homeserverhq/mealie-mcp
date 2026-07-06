@@ -1,3 +1,4 @@
+from __future__ import annotations
 import datetime as dt
 import os
 import sys
@@ -75,15 +76,14 @@ class CreateRecipeParam(BaseModel):
     recipeYield: str = ""
     recipeYieldQuantity: float = 0
     orgURL: str = ""
-    recipeCategory: list = []
-    tags: list = []
-    tools: list = []
-    recipeIngredient: list = []
-    recipeInstructions: list = []
-    nutrition: dict = {}
-    settings: dict = {}
-    notes: list = []
-    extras: dict = {}
+    recipeCategory: list[CategoryObjectInput] = []
+    tags: list[TagObjectInput] = []
+    tools: list[ToolObjectInput] = []
+    recipeIngredient: list[RecipeIngredientParam] = []
+    recipeInstructions: list[RecipeInstructionParam] = []
+    nutrition: Optional[NutritionInput] = None
+    settings: Optional[RecipeSettingsParam] = None
+    notes: list[RecipeNoteParam] = []
     image: str = ""
 
 class TagObjectInput(BaseModel):
@@ -149,15 +149,14 @@ class UpdateRecipeParam(BaseModel):
     recipeYield: Optional[str] = None
     recipeYieldQuantity: Optional[float] = None
     orgURL: Optional[str] = None
-    recipeCategory: Optional[list] = None
-    tags: Optional[list] = None
-    tools: Optional[list] = None
-    recipeIngredient: Optional[list] = None
-    recipeInstructions: Optional[list] = None
-    nutrition: Optional[dict] = None
-    settings: Optional[dict] = None
-    notes: Optional[list] = None
-    extras: Optional[dict] = None
+    recipeCategory: Optional[list[CategoryObjectInput]] = None
+    tags: Optional[list[TagObjectInput]] = None
+    tools: Optional[list[ToolObjectInput]] = None
+    recipeIngredient: Optional[list[RecipeIngredientParam]] = None
+    recipeInstructions: Optional[list[RecipeInstructionParam]] = None
+    nutrition: Optional[NutritionInput] = None
+    settings: Optional[RecipeSettingsParam] = None
+    notes: Optional[list[RecipeNoteParam]] = None
     image: Optional[str] = None
 
 class CreateCategoryParam(BaseModel):
@@ -256,11 +255,9 @@ class UpdateMealplanParam(BaseModel):
 
 class CreateShoppingListParam(BaseModel):
     name: str
-    extras: dict = {}
 
 class UpdateShoppingListParam(BaseModel):
     name: Optional[str] = None
-    extras: Optional[dict] = None
 
 class CreateShoppingItemParam(BaseModel):
     shoppingListId: str
@@ -272,7 +269,6 @@ class CreateShoppingItemParam(BaseModel):
     foodId: str = ""
     labelId: str = ""
     unitId: str = ""
-    extras: dict = {}
 
 class UpdateShoppingItemParam(BaseModel):
     quantity: Optional[float] = None
@@ -283,7 +279,6 @@ class UpdateShoppingItemParam(BaseModel):
     foodId: Optional[str] = None
     labelId: Optional[str] = None
     unitId: Optional[str] = None
-    extras: Optional[dict] = None
 
 class BulkCreateShoppingItem(BaseModel):
     """Shopping item for bulk creation."""
@@ -632,7 +627,6 @@ async def create_recipe(
     nutrition: Optional[NutritionInput] = None,
     settings: RecipeSettingsParam = None,
     notes: list[RecipeNoteParam] = [],
-    extras: dict = {},
     image: str = "",
     ctx: Context = None
 ) -> dict[str, Any]:
@@ -656,7 +650,6 @@ async def create_recipe(
         nutrition: NutritionInput object with optional fields: calories, carbohydrateContent, cholesterolContent, fatContent, fiberContent, proteinContent, saturatedFatContent, sodiumContent, sugarContent, transFatContent, unsaturatedFatContent.
         settings: Recipe settings object. Known keys: public (bool), showNutrition (bool), showAssets (bool), landscapeView (bool), disableComments (bool), locked (bool).
         notes: List of note objects with keys: title (str), text (str).
-        extras: Custom key-value pairs (string keys and string values) for extended data.
         image: Image URL to scrape.
     """
     params = CreateRecipeParam(
@@ -665,10 +658,10 @@ async def create_recipe(
         recipeYield=recipeYield, recipeYieldQuantity=recipeYieldQuantity, orgURL=orgURL,
         recipeCategory=recipeCategory, tags=tags, tools=tools,
         recipeIngredient=recipeIngredient, recipeInstructions=recipeInstructions,
-        nutrition=nutrition.model_dump(exclude_none=True) if nutrition else {},
-        settings=settings.model_dump(exclude_none=True) if settings else {},
+        nutrition=nutrition,
+        settings=settings,
         notes=[n.model_dump() for n in notes] if notes else [],
-        extras=extras, image=image
+        image=image
     )
     slug_raw = await get_client().create_recipe({"name": params.name}, get_user_token())
     slug = slug_raw if isinstance(slug_raw, str) else slug_raw.get("slug", "")
@@ -699,7 +692,6 @@ async def create_recipe(
         "nutrition": params.nutrition,
         "settings": params.settings,
         "notes": params.notes,
-        "extras": params.extras,
         "image": params.image,
     })
 
@@ -766,7 +758,6 @@ async def update_recipe(
     nutrition: Optional[NutritionInput] = None,
     settings: RecipeSettingsParam = None,
     notes: list[RecipeNoteParam] = None,
-    extras: dict = None,
     image: str = None,
     ctx: Context = None
 ) -> dict[str, Any]:
@@ -791,7 +782,6 @@ async def update_recipe(
         nutrition: NutritionInput object with optional fields: calories, carbohydrateContent, cholesterolContent, fatContent, fiberContent, proteinContent, saturatedFatContent, sodiumContent, sugarContent, transFatContent, unsaturatedFatContent.
         settings: Recipe settings object. Known keys: public (bool), showNutrition (bool), showAssets (bool), landscapeView (bool), disableComments (bool), locked (bool).
         notes: List of note objects with keys: title (str), text (str).
-        extras: Custom key-value pairs (string keys and string values).
         image: Image URL to scrape.
     """
     params = UpdateRecipeParam(
@@ -800,10 +790,10 @@ async def update_recipe(
         recipeYield=recipeYield, recipeYieldQuantity=recipeYieldQuantity, orgURL=orgURL,
         recipeCategory=recipeCategory, tags=tags, tools=tools,
         recipeIngredient=recipeIngredient, recipeInstructions=recipeInstructions,
-        nutrition=nutrition.model_dump(exclude_none=True) if nutrition else None,
-        settings=settings.model_dump(exclude_none=True) if settings else None,
+        nutrition=nutrition,
+        settings=settings,
         notes=[n.model_dump() for n in notes] if notes else None,
-        extras=extras, image=image
+        image=image
     )
     recipe = await get_client().get_recipe_by_slug(slug, get_user_token(), include_all_fields=True)
     if not isinstance(recipe, dict):
@@ -819,7 +809,7 @@ async def update_recipe(
         "performTime": params.performTime, "recipeYield": params.recipeYield,
         "recipeYieldQuantity": params.recipeYieldQuantity, "orgURL": params.orgURL,
         "nutrition": params.nutrition, "settings": params.settings, "notes": params.notes,
-        "extras": params.extras, "image": params.image,
+        "image": params.image,
     }
     recipe.update({k: v for k, v in scalar_fields.items() if v is not None})
 
@@ -2106,15 +2096,13 @@ async def get_shopping_list_by_id(
 @mcp.tool()
 async def create_shopping_list(
     name: str,
-    extras: dict = {},
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a new shopping list.
     Args:
         name: Name of the shopping list.
-        extras: Custom key-value pairs for extended data.
     """
-    params = CreateShoppingListParam(name=name, extras=extras)
+    params = CreateShoppingListParam(name=name)
     return await get_client().create_shopping_list(
         params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
         include_all_fields=ALLOW_ALL_AGGREGATE
@@ -2124,16 +2112,14 @@ async def create_shopping_list(
 async def update_shopping_list(
     id: str,
     name: str = None,
-    extras: dict = None,
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update an existing shopping list.
     Args:
         id: The ID of the shopping list to update.
         name: New name.
-        extras: New custom key-value pairs.
     """
-    params = UpdateShoppingListParam(name=name, extras=extras)
+    params = UpdateShoppingListParam(name=name)
     return await get_client().update_shopping_list(
         id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
         include_all_fields=ALLOW_ALL_AGGREGATE
@@ -2247,7 +2233,6 @@ async def create_shopping_item(
     foodId: str = "",
     labelId: str = "",
     unitId: str = "",
-    extras: dict = {},
     ctx: Context = None
 ) -> dict[str, Any]:
     """Create a new shopping list item.
@@ -2261,12 +2246,11 @@ async def create_shopping_item(
         foodId: ID of the associated food.
         labelId: ID of the associated label.
         unitId: ID of the associated unit.
-        extras: Custom key-value pairs.
     """
     params = CreateShoppingItemParam(
         shoppingListId=shoppingListId, quantity=quantity, note=note,
         display=display, checked=checked, position=position,
-        foodId=foodId, labelId=labelId, unitId=unitId, extras=extras
+        foodId=foodId, labelId=labelId, unitId=unitId
     )
     payload = params.model_dump(exclude_unset=True, exclude_none=True)
     payload = {k: v for k, v in payload.items() if not (isinstance(v, str) and v == "" and k in ("foodId", "labelId", "unitId"))}
@@ -2287,7 +2271,6 @@ async def update_shopping_item(
     foodId: str = None,
     labelId: str = None,
     unitId: str = None,
-    extras: dict = None,
     ctx: Context = None
 ) -> dict[str, Any]:
     """Update an existing shopping list item.
@@ -2302,12 +2285,11 @@ async def update_shopping_item(
         foodId: New food ID.
         labelId: New label ID.
         unitId: New unit ID.
-        extras: New custom key-value pairs.
     """
     params = UpdateShoppingItemParam(
         quantity=quantity, note=note, display=display, checked=checked,
         position=position, foodId=foodId, labelId=labelId,
-        unitId=unitId, extras=extras
+        unitId=unitId
     )
     payload = params.model_dump(exclude_unset=True, exclude_none=True)
     if shoppingListId:
