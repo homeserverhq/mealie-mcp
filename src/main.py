@@ -49,23 +49,6 @@ def get_user_token() -> Optional[str]:
 # Pydantic Contract Models
 # =============================================================================
 
-class RecipeIngredientParam(BaseModel):
-    """Recipe ingredient. Can also be a plain string like '3 cups flour'."""
-    quantity: float = Field(default=0, description="Quantity of the ingredient.")
-    unit: Optional[str] = Field(default=None, description="Unit name (e.g. cup, gram).")
-    food: Optional[str] = Field(default=None, description="Food name (e.g. flour, butter).")
-    note: str = Field(default="", description="Additional note (e.g. sifted, room temperature).")
-    display: str = Field(default="", description="Full display text (e.g. 3 cups flour, sifted).")
-    title: str = Field(default="", description="Section title for grouping ingredients.")
-    originalText: str = Field(default="", description="Original text as parsed from the recipe.")
-    referenceId: Optional[str] = Field(default=None, description="Reference ID for linking to original source.")
-
-class RecipeInstructionParam(BaseModel):
-    """Recipe instruction step."""
-    text: str = Field(description="Instruction text for this step.")
-    title: str = Field(default="", description="Title for this instruction step.")
-    summary: str = Field(default="", description="Short summary of this step.")
-
 class CreateRecipeParam(BaseModel):
     name: str
     description: str = ""
@@ -80,8 +63,8 @@ class CreateRecipeParam(BaseModel):
     recipeCategory: list[CategoryObjectInput] = []
     tags: list[TagObjectInput] = []
     tools: list[ToolObjectInput] = []
-    recipeIngredient: list[RecipeIngredientParam] = []
-    recipeInstructions: list[RecipeInstructionParam] = []
+    recipeIngredient: list[str] = Field(default=[], description="Ingredient strings (e.g. '1 cup flour, sifted').")
+    recipeInstructions: list[str] = Field(default=[], description="Instruction step strings (e.g. 'Preheat oven to 350F').")
     nutrition: Optional[NutritionInput] = None
     settings: Optional[RecipeSettingsParam] = None
     notes: list[RecipeNoteParam] = []
@@ -153,8 +136,8 @@ class UpdateRecipeParam(BaseModel):
     recipeCategory: Optional[list[CategoryObjectInput]] = None
     tags: Optional[list[TagObjectInput]] = None
     tools: Optional[list[ToolObjectInput]] = None
-    recipeIngredient: Optional[list[RecipeIngredientParam]] = None
-    recipeInstructions: Optional[list[RecipeInstructionParam]] = None
+    recipeIngredient: Optional[list[str]] = Field(default=None, description="Ingredient strings (e.g. '1 cup flour, sifted').")
+    recipeInstructions: Optional[list[str]] = Field(default=None, description="Instruction step strings (e.g. 'Preheat oven to 350F').")
     nutrition: Optional[NutritionInput] = None
     settings: Optional[RecipeSettingsParam] = None
     notes: Optional[list[RecipeNoteParam]] = None
@@ -625,8 +608,8 @@ async def create_recipe(
     recipeCategory: list[CategoryObjectInput] = [],
     tags: list[TagObjectInput] = [],
     tools: list[ToolObjectInput] = [],
-    recipeIngredient: list[RecipeIngredientParam] = [],
-    recipeInstructions: list[RecipeInstructionParam] = [],
+    recipeIngredient: list[str] = [],
+    recipeInstructions: list[str] = [],
     nutrition: Optional[NutritionInput] = None,
     settings: RecipeSettingsParam = None,
     notes: list[RecipeNoteParam] = [],
@@ -649,8 +632,8 @@ async def create_recipe(
         recipeCategory: Categories for the recipe.
         tags: Tags for the recipe.
         tools: Tools for the recipe.
-        recipeIngredient: Ingredient strings or objects.
-        recipeInstructions: Instruction steps.
+        recipeIngredient: Ingredient strings (e.g. '1 cup flour, sifted').
+        recipeInstructions: Instruction step strings (e.g. 'Preheat oven to 350F').
         nutrition: Nutrition information.
         settings: Recipe settings.
         notes: Recipe notes.
@@ -705,10 +688,7 @@ async def create_recipe(
             for i in params.recipeIngredient
         ]
     if params.recipeInstructions is not None:
-        recipe["recipeInstructions"] = [
-            {"id": None, **i.model_dump(exclude_none=True)}
-            for i in params.recipeInstructions
-        ]
+        recipe["recipeInstructions"] = [{"text": i} for i in params.recipeInstructions]
 
     result = await get_client().update_recipe(
         slug, recipe, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE
@@ -757,8 +737,8 @@ async def update_recipe(
     recipeCategory: list[CategoryObjectInput] = None,
     tags: list[TagObjectInput] = None,
     tools: list[ToolObjectInput] = None,
-    recipeIngredient: list[RecipeIngredientParam] = None,
-    recipeInstructions: list[RecipeInstructionParam] = None,
+    recipeIngredient: list[str] = None,
+    recipeInstructions: list[str] = None,
     nutrition: Optional[NutritionInput] = None,
     settings: RecipeSettingsParam = None,
     notes: list[RecipeNoteParam] = None,
@@ -782,8 +762,8 @@ async def update_recipe(
         recipeCategory: Categories for the recipe.
         tags: Tags for the recipe.
         tools: Tools for the recipe.
-        recipeIngredient: Ingredient strings or objects.
-        recipeInstructions: Instruction steps.
+        recipeIngredient: Ingredient strings (e.g. '1 cup flour, sifted').
+        recipeInstructions: Instruction step strings (e.g. 'Preheat oven to 350F').
         nutrition: Nutrition information.
         settings: Recipe settings.
         notes: Recipe notes.
@@ -824,10 +804,7 @@ async def update_recipe(
             for i in params.recipeIngredient
         ]
     if params.recipeInstructions is not None:
-        recipe["recipeInstructions"] = [
-            {"id": None, **i.model_dump(exclude_none=True)}
-            for i in params.recipeInstructions
-        ]
+        recipe["recipeInstructions"] = [{"text": i} for i in params.recipeInstructions]
 
     if _update_tags is not None:
         recipe["tags"] = []
