@@ -2,7 +2,7 @@
 
 This repository contains a Model Context Protocol (MCP) server that acts
 as a secure, multi-tenant proxy between an AI Assistant and the Mealie
-backend API. It exposes **175 MCP tools** covering 23 resource domains
+backend API. It exposes **175 MCP tools** covering 25 resource domains
 with full CRUD, meal planning, recipe scraping, and bulk operations.
 
 ## ✨ Features
@@ -14,7 +14,7 @@ with full CRUD, meal planning, recipe scraping, and bulk operations.
   user identity isolation, ensuring all AI-driven actions are scoped to
   the authenticated user's permissions.
 - **📊 Full Mealie Coverage** — 175 tools mapped to Mealie API endpoints
-  across 23 resource domains.
+  across 25 resource domains.
 - **⚡ TOON Optimization** — Bulk list responses are automatically compressed
   using TOON (Token-Optimized Object Notation) to reduce token consumption
   and maximize context window efficiency.
