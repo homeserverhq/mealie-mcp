@@ -84,9 +84,7 @@ The MCP server serves at `http://mealie-mcp:80/mcp` (Streamable HTTP).
 
 The server implements 175 MCP tools organized into the following categories:
 
-### 🍲 Recipes (22 tools)
-
-**CRUD & Core (9 tools)**
+### 📋 Recipe CRUD & Core (9 tools)
 
 - `list_all_recipes` — List all recipes with pagination and search
 - `get_recipe_by_slug` — Get a single recipe by slug
@@ -98,7 +96,7 @@ The server implements 175 MCP tools organized into the following categories:
 - `bulk_update_recipe_settings` — Bulk update recipe settings
 - `list_recipe_suggestions` — List recipe suggestions
 
-**Import & Scrape (6 tools)**
+### 🌐 Recipe Import & Scrape (6 tools)
 
 - `create_recipe_from_url` — Create a recipe by scraping a URL
 - `create_recipe_from_url_bulk` — Bulk create recipes from URLs
@@ -107,7 +105,7 @@ The server implements 175 MCP tools organized into the following categories:
 - `scrape_recipe_image_url` — Scrape image URL into a recipe
 - `delete_recipe_image` — Delete a recipe image
 
-**Export & Bulk (7 tools)**
+### 📦 Recipe Export & Bulk (7 tools)
 
 - `list_recipe_export_formats` — List export formats
 - `export_recipe` — Export a single recipe
