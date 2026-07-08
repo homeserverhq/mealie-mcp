@@ -86,6 +86,8 @@ The server implements 175 MCP tools organized into the following categories:
 
 ### 🍲 Recipes (22 tools)
 
+**CRUD & Core (9 tools)**
+
 - `list_all_recipes` — List all recipes with pagination and search
 - `get_recipe_by_slug` — Get a single recipe by slug
 - `create_recipe` — Create a new recipe
@@ -95,12 +97,18 @@ The server implements 175 MCP tools organized into the following categories:
 - `update_recipe_last_made` — Update the last-made date
 - `bulk_update_recipe_settings` — Bulk update recipe settings
 - `list_recipe_suggestions` — List recipe suggestions
+
+**Import & Scrape (6 tools)**
+
 - `create_recipe_from_url` — Create a recipe by scraping a URL
 - `create_recipe_from_url_bulk` — Bulk create recipes from URLs
 - `create_recipe_from_html_or_json` — Create from HTML/JSON-LD
 - `test_scrape_url` — Test URL scraping
 - `scrape_recipe_image_url` — Scrape image URL into a recipe
 - `delete_recipe_image` — Delete a recipe image
+
+**Export & Bulk (7 tools)**
+
 - `list_recipe_export_formats` — List export formats
 - `export_recipe` — Export a single recipe
 - `bulk_tag_recipes` — Bulk assign tags to recipes
