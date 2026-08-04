@@ -624,7 +624,7 @@ async def main():
         # Phase 6g: Recipe Action CRUD
         # =================================================================
         log("\n=== Phase 6g: Recipe Action CRUD ===")
-        await run_test_with_store(session, "L1 create_recipe_action", "create_recipe_action", {"name": make_name("TestAction"), "recipeActionType": "link"}, store_key="recipe_action")
+        await run_test_with_store(session, "L1 create_recipe_action", "create_recipe_action", {"name": make_name("TestAction"), "recipeActionType": "link", "url": "https://example.com"}, store_key="recipe_action")
         await run_test(session, "L2 get_recipe_action_by_id", "get_recipe_action_by_id", {"id": pick_id("recipe_action") or "0"})
         await run_test(session, "L3 update_recipe_action", "update_recipe_action", {"id": pick_id("recipe_action") or "0", "description": "Updated desc"})
         await run_test(session, "L4 delete_recipe_action_by_id", "delete_recipe_action_by_id", {"id": pick_id("recipe_action") or "0"})

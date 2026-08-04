@@ -7,6 +7,7 @@ from contextvars import ContextVar
 from typing import Any, Optional
 
 from fastmcp import FastMCP, Context
+from mcp.types import ToolAnnotations
 from pydantic import BaseModel, Field
 from toon_mcp import json_to_toon
 
@@ -453,7 +454,9 @@ def _normalize_enum(value: str, valid: set[str], param_name: str) -> str:
 # Recipes
 # =============================================================================
 
-@mcp.tool(tags={"read", "basic", "mealie"})
+@mcp.tool(
+    tags={"basic", "mealie"}, annotations=ToolAnnotations(title="List All Recipes", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_all_recipes(
     include_all_fields: bool = False,
     page: int = 1,
@@ -481,7 +484,9 @@ async def list_all_recipes(
         data["items"] = [_add_recipe_urls(item, public_hostname) for item in data["items"]]
     return {"items": json_to_toon(data)}
 
-@mcp.tool(tags={"read", "basic", "mealie"})
+@mcp.tool(
+    tags={"basic", "mealie"}, annotations=ToolAnnotations(title="Get Recipe By Slug", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_recipe_by_slug(
     slug: str,
     include_all_fields: bool = False,
@@ -593,7 +598,9 @@ async def _bulk_patch_recipes(
     }
 
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Create Recipe", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def create_recipe(
     name: str,
     description: str = "",
@@ -721,7 +728,9 @@ async def create_recipe(
         return _add_recipe_urls(result, get_client().public_hostname)
     return {"slug": slug, "status": "created"}
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Update Recipe", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_recipe(
     slug: str,
     name: str = None,
@@ -844,7 +853,9 @@ async def update_recipe(
         return _add_recipe_urls(result, get_client().public_hostname)
     return result
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Recipe By Slug", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def delete_recipe_by_slug(
     slug: str,
     ctx: Context = None
@@ -857,7 +868,9 @@ async def delete_recipe_by_slug(
     await get_client().delete_recipe_by_slug(slug, get_user_token())
     return {"success": True, "message": "Recipe deleted successfully"}
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Duplicate Recipe", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def duplicate_recipe(
     slug: str,
     ctx: Context = None
@@ -869,7 +882,9 @@ async def duplicate_recipe(
     """
     return await get_client().duplicate_recipe(slug, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Update Recipe Last Made", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_recipe_last_made(
     slug: str,
     ctx: Context = None
@@ -881,7 +896,9 @@ async def update_recipe_last_made(
     """
     return await get_client().update_recipe_last_made(slug, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Bulk Update Recipe Settings", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def bulk_update_recipe_settings(
     recipes: list[str],
     settings: BulkRecipeSettingsInput,
@@ -902,7 +919,9 @@ async def bulk_update_recipe_settings(
 
     return await get_client().bulk_update_recipe_settings(recipes, settings_dict, get_user_token())
 
-@mcp.tool(tags={"read", "basic", "mealie"})
+@mcp.tool(
+    tags={"basic", "mealie"}, annotations=ToolAnnotations(title="List Recipe Suggestions", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_recipe_suggestions(
     include_all_fields: bool = False,
     ctx: Context = None
@@ -914,7 +933,9 @@ async def list_recipe_suggestions(
     """
     return await get_client().get_recipe_suggestions(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Create Recipe From Url", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=True)
+)
 async def create_recipe_from_url(
     url: str,
     includeTags: bool = True,
@@ -937,7 +958,9 @@ async def create_recipe_from_url(
         return {"slug": result}
     return result if isinstance(result, dict) else {"result": result}
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Create Recipe From Url Bulk", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=True)
+)
 async def create_recipe_from_url_bulk(
     urls: list[str],
     ctx: Context = None
@@ -949,7 +972,9 @@ async def create_recipe_from_url_bulk(
     """
     return await get_client().create_recipe_from_url_bulk(urls, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Create Recipe From Html Or Json", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def create_recipe_from_html_or_json(
     data: str,
     ctx: Context = None
@@ -964,7 +989,9 @@ async def create_recipe_from_html_or_json(
         return {"slug": result}
     return result if isinstance(result, dict) else {"result": result}
 
-@mcp.tool(tags={"read", "basic", "mealie"})
+@mcp.tool(
+    tags={"basic", "mealie"}, annotations=ToolAnnotations(title="Test Scrape Url", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True)
+)
 async def test_scrape_url(
     url: str,
     ctx: Context = None
@@ -977,7 +1004,9 @@ async def test_scrape_url(
     result = await get_client().test_scrape_url(url, get_user_token())
     return {"result": result}
 
-@mcp.tool(tags={"write", "basic", "mealie"})
+@mcp.tool(
+    tags={"basic", "mealie"}, annotations=ToolAnnotations(title="Scrape Recipe Image Url", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True)
+)
 async def scrape_recipe_image_url(
     slug: str,
     url: str,
@@ -991,7 +1020,9 @@ async def scrape_recipe_image_url(
     """
     return await get_client().scrape_recipe_image_url(slug, url, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Delete Recipe Image", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def delete_recipe_image(
     slug: str,
     ctx: Context = None
@@ -1004,14 +1035,18 @@ async def delete_recipe_image(
     await get_client().delete_recipe_image(slug, get_user_token())
     return {"success": True, "message": "Recipe image deleted successfully"}
 
-@mcp.tool(tags={"read", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="List Recipe Export Formats", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_recipe_export_formats(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get available export formats and templates for recipes."""
     return await get_client().get_recipe_export_formats(get_user_token())
 
-@mcp.tool(tags={"read", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Export Recipe", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def export_recipe(
     slug: str,
     ctx: Context = None
@@ -1023,7 +1058,9 @@ async def export_recipe(
     """
     return await get_client().export_recipe(slug, get_user_token())
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Bulk Tag Recipes", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def bulk_tag_recipes(
     recipes: list[str],
     tags: list[TagObjectInput],
@@ -1041,7 +1078,9 @@ async def bulk_tag_recipes(
     resolved = await _resolve_labels_by_slug(tags, get_client().get_all_tags, get_client().create_tag, get_user_token())
     return await _bulk_patch_recipes(recipes, "tags", resolved, get_user_token())
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Bulk Categorize Recipes", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def bulk_categorize_recipes(
     recipes: list[str],
     categories: list[CategoryObjectInput],
@@ -1059,7 +1098,9 @@ async def bulk_categorize_recipes(
     resolved = await _resolve_labels_by_slug(categories, get_client().get_all_categories, get_client().create_category, get_user_token())
     return await _bulk_patch_recipes(recipes, "recipeCategory", resolved, get_user_token())
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Bulk Delete Recipes", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def bulk_delete_recipes(
     recipes: list[str],
     ctx: Context = None
@@ -1072,7 +1113,9 @@ async def bulk_delete_recipes(
     await get_client().bulk_delete_recipes(recipes, get_user_token())
     return {"status": "deleted", "count": len(recipes)}
 
-@mcp.tool(tags={"read", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="List Exports", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_exports(
     include_all_fields: bool = False,
     ctx: Context = None
@@ -1085,7 +1128,9 @@ async def list_exports(
     data = await get_client().list_exports(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
     return {"exports": data if isinstance(data, list) else []}
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Purge Exports", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def purge_exports(
     ctx: Context = None
 ) -> dict[str, Any]:
@@ -1096,7 +1141,9 @@ async def purge_exports(
 # Categories
 # =============================================================================
 
-@mcp.tool(tags={"read", "basic", "mealie"})
+@mcp.tool(
+    tags={"basic", "mealie"}, annotations=ToolAnnotations(title="List All Categories", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_all_categories(
     include_all_fields: bool = False,
     page: int = 1,
@@ -1116,7 +1163,9 @@ async def list_all_categories(
     )
     return {"items": json_to_toon(data)}
 
-@mcp.tool(tags={"read", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Category By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_category_by_id(
     id: str,
     include_all_fields: bool = False,
@@ -1130,7 +1179,9 @@ async def get_category_by_id(
     """
     return await get_client().get_category_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
-@mcp.tool(tags={"read", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Category By Slug", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_category_by_slug(
     slug: str,
     include_all_fields: bool = False,
@@ -1144,7 +1195,9 @@ async def get_category_by_slug(
     """
     return await get_client().get_category_by_slug(slug, get_user_token(), include_all_fields=include_all_fields)
 
-@mcp.tool(tags={"read", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="List Empty Categories", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_empty_categories(
     include_all_fields: bool = False,
     ctx: Context = None
@@ -1157,7 +1210,9 @@ async def list_empty_categories(
     data = await get_client().get_empty_categories(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
     return {"items": json_to_toon(data)}
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Create Category", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def create_category(
     name: str,
     ctx: Context = None
@@ -1173,7 +1228,9 @@ async def create_category(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Update Category", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_category(
     id: str,
     name: str = None,
@@ -1191,7 +1248,9 @@ async def update_category(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Category By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def delete_category_by_id(
     id: str,
     ctx: Context = None
@@ -1208,7 +1267,9 @@ async def delete_category_by_id(
 # Tags
 # =============================================================================
 
-@mcp.tool(tags={"read", "basic", "mealie"})
+@mcp.tool(
+    tags={"basic", "mealie"}, annotations=ToolAnnotations(title="List All Tags", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_all_tags(
     include_all_fields: bool = False,
     page: int = 1,
@@ -1228,7 +1289,9 @@ async def list_all_tags(
     )
     return {"items": json_to_toon(data)}
 
-@mcp.tool(tags={"read", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Tag By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_tag_by_id(
     id: str,
     include_all_fields: bool = False,
@@ -1242,7 +1305,9 @@ async def get_tag_by_id(
     """
     return await get_client().get_tag_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
-@mcp.tool(tags={"read", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Tag By Slug", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_tag_by_slug(
     slug: str,
     include_all_fields: bool = False,
@@ -1256,7 +1321,9 @@ async def get_tag_by_slug(
     """
     return await get_client().get_tag_by_slug(slug, get_user_token(), include_all_fields=include_all_fields)
 
-@mcp.tool(tags={"read", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="List Empty Tags", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_empty_tags(
     include_all_fields: bool = False,
     ctx: Context = None
@@ -1269,7 +1336,9 @@ async def list_empty_tags(
     data = await get_client().get_empty_tags(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
     return {"items": json_to_toon(data)}
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Create Tag", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def create_tag(
     name: str,
     ctx: Context = None
@@ -1285,7 +1354,9 @@ async def create_tag(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Update Tag", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_tag(
     id: str,
     name: str = None,
@@ -1303,7 +1374,9 @@ async def update_tag(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Tag By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def delete_tag_by_id(
     id: str,
     ctx: Context = None
@@ -1320,7 +1393,9 @@ async def delete_tag_by_id(
 # Tools
 # =============================================================================
 
-@mcp.tool(tags={"read", "basic", "mealie"})
+@mcp.tool(
+    tags={"basic", "mealie"}, annotations=ToolAnnotations(title="List All Tools", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_all_tools(
     include_all_fields: bool = False,
     page: int = 1,
@@ -1340,7 +1415,9 @@ async def list_all_tools(
     )
     return {"items": json_to_toon(data)}
 
-@mcp.tool(tags={"read", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Tool By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_tool_by_id(
     id: str,
     include_all_fields: bool = False,
@@ -1354,7 +1431,9 @@ async def get_tool_by_id(
     """
     return await get_client().get_tool_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
-@mcp.tool(tags={"read", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Tool By Slug", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_tool_by_slug(
     slug: str,
     include_all_fields: bool = False,
@@ -1368,7 +1447,9 @@ async def get_tool_by_slug(
     """
     return await get_client().get_tool_by_slug(slug, get_user_token(), include_all_fields=include_all_fields)
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Create Tool", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def create_tool(
     name: str,
     ctx: Context = None
@@ -1384,7 +1465,9 @@ async def create_tool(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Update Tool", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_tool(
     id: str,
     name: str = None,
@@ -1402,7 +1485,9 @@ async def update_tool(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Tool By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def delete_tool_by_id(
     id: str,
     ctx: Context = None
@@ -1419,7 +1504,9 @@ async def delete_tool_by_id(
 # Foods
 # =============================================================================
 
-@mcp.tool(tags={"read", "basic", "mealie"})
+@mcp.tool(
+    tags={"basic", "mealie"}, annotations=ToolAnnotations(title="List All Foods", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_all_foods(
     include_all_fields: bool = False,
     page: int = 1,
@@ -1439,7 +1526,9 @@ async def list_all_foods(
     )
     return {"items": json_to_toon(data)}
 
-@mcp.tool(tags={"read", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Food By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_food_by_id(
     id: str,
     include_all_fields: bool = False,
@@ -1453,7 +1542,9 @@ async def get_food_by_id(
     """
     return await get_client().get_food_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Create Food", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def create_food(
     name: str,
     description: str = "",
@@ -1477,7 +1568,9 @@ async def create_food(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Update Food", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_food(
     id: str,
     name: str = None,
@@ -1503,7 +1596,9 @@ async def update_food(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Food By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def delete_food_by_id(
     id: str,
     ctx: Context = None
@@ -1516,7 +1611,9 @@ async def delete_food_by_id(
     await get_client().delete_food_by_id(id, get_user_token())
     return {"success": True, "message": "Food deleted successfully"}
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Merge Foods", readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False)
+)
 async def merge_foods(
     food_to_keep: str,
     food_to_merge: str,
@@ -1534,7 +1631,9 @@ async def merge_foods(
 # Units
 # =============================================================================
 
-@mcp.tool(tags={"read", "basic", "mealie"})
+@mcp.tool(
+    tags={"basic", "mealie"}, annotations=ToolAnnotations(title="List All Units", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_all_units(
     include_all_fields: bool = False,
     page: int = 1,
@@ -1554,7 +1653,9 @@ async def list_all_units(
     )
     return {"items": json_to_toon(data)}
 
-@mcp.tool(tags={"read", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Unit By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_unit_by_id(
     id: str,
     include_all_fields: bool = False,
@@ -1568,7 +1669,9 @@ async def get_unit_by_id(
     """
     return await get_client().get_unit_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Create Unit", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def create_unit(
     name: str,
     abbreviation: str = "",
@@ -1602,7 +1705,9 @@ async def create_unit(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Update Unit", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_unit(
     id: str,
     name: str = None,
@@ -1638,7 +1743,9 @@ async def update_unit(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Unit By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def delete_unit_by_id(
     id: str,
     ctx: Context = None
@@ -1651,7 +1758,9 @@ async def delete_unit_by_id(
     await get_client().delete_unit_by_id(id, get_user_token())
     return {"success": True, "message": "Unit deleted successfully"}
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Merge Units", readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False)
+)
 async def merge_units(
     unit_to_keep: str,
     unit_to_merge: str,
@@ -1669,7 +1778,9 @@ async def merge_units(
 # Comments
 # =============================================================================
 
-@mcp.tool(tags={"read", "basic", "mealie"})
+@mcp.tool(
+    tags={"basic", "mealie"}, annotations=ToolAnnotations(title="List All Comments", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_all_comments(
     include_all_fields: bool = False,
     page: int = 1,
@@ -1689,7 +1800,9 @@ async def list_all_comments(
     )
     return {"items": json_to_toon(data)}
 
-@mcp.tool(tags={"read", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Comment By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_comment_by_id(
     id: str,
     include_all_fields: bool = False,
@@ -1703,7 +1816,9 @@ async def get_comment_by_id(
     """
     return await get_client().get_comment_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Create Comment", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def create_comment(
     recipeId: str,
     text: str,
@@ -1721,7 +1836,9 @@ async def create_comment(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Update Comment", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_comment(
     id: str,
     text: str = None,
@@ -1739,7 +1856,9 @@ async def update_comment(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Comment By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def delete_comment_by_id(
     id: str,
     ctx: Context = None
@@ -1756,7 +1875,9 @@ async def delete_comment_by_id(
 # Cookbooks
 # =============================================================================
 
-@mcp.tool(tags={"read", "basic", "mealie"})
+@mcp.tool(
+    tags={"basic", "mealie"}, annotations=ToolAnnotations(title="List All Cookbooks", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_all_cookbooks(
     include_all_fields: bool = False,
     page: int = 1,
@@ -1776,7 +1897,9 @@ async def list_all_cookbooks(
     )
     return {"items": json_to_toon(data)}
 
-@mcp.tool(tags={"read", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Cookbook By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_cookbook_by_id(
     id: str,
     include_all_fields: bool = False,
@@ -1790,7 +1913,9 @@ async def get_cookbook_by_id(
     """
     return await get_client().get_cookbook_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Create Cookbook", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def create_cookbook(
     name: str,
     description: str = "",
@@ -1817,7 +1942,9 @@ async def create_cookbook(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Update Cookbook", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_cookbook(
     id: str,
     name: str = None,
@@ -1846,7 +1973,9 @@ async def update_cookbook(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Cookbook By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def delete_cookbook_by_id(
     id: str,
     ctx: Context = None
@@ -1859,7 +1988,9 @@ async def delete_cookbook_by_id(
     await get_client().delete_cookbook_by_id(id, get_user_token())
     return {"success": True, "message": "Cookbook deleted successfully"}
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Update Cookbooks", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_cookbooks(
     cookbooks: list[CookbookUpdateItemParam],
     ctx: Context = None
@@ -1876,7 +2007,9 @@ async def update_cookbooks(
 # Mealplans
 # =============================================================================
 
-@mcp.tool(tags={"read", "basic", "mealie"})
+@mcp.tool(
+    tags={"basic", "mealie"}, annotations=ToolAnnotations(title="List All Mealplans", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_all_mealplans(
     include_all_fields: bool = False,
     page: int = 1,
@@ -1901,7 +2034,9 @@ async def list_all_mealplans(
     )
     return {"items": json_to_toon(data)}
 
-@mcp.tool(tags={"read", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Mealplan By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_mealplan_by_id(
     id: int,
     include_all_fields: bool = False,
@@ -1915,7 +2050,9 @@ async def get_mealplan_by_id(
     """
     return await get_client().get_mealplan_by_id(str(id), get_user_token(), include_all_fields=include_all_fields)
 
-@mcp.tool(tags={"read", "basic", "mealie"})
+@mcp.tool(
+    tags={"basic", "mealie"}, annotations=ToolAnnotations(title="List Todays Meals", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_todays_meals(
     include_all_fields: bool = False,
     ctx: Context = None
@@ -1928,7 +2065,9 @@ async def list_todays_meals(
     data = await get_client().get_todays_meals(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
     return {"meals": data if isinstance(data, list) else []}
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Create Mealplan", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def create_mealplan(
     date: str,
     entryType: str = "dinner",
@@ -1954,7 +2093,9 @@ async def create_mealplan(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Create Random Mealplan", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def create_random_mealplan(
     date: str = "",
     ctx: Context = None
@@ -1968,7 +2109,9 @@ async def create_random_mealplan(
         date = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d")
     return await get_client().create_random_mealplan({"date": date}, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Update Mealplan", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_mealplan(
     id: int,
     date: str = None,
@@ -1999,7 +2142,9 @@ async def update_mealplan(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Mealplan By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def delete_mealplan_by_id(
     id: int,
     ctx: Context = None
@@ -2016,7 +2161,9 @@ async def delete_mealplan_by_id(
 # Mealplan Rules
 # =============================================================================
 
-@mcp.tool(tags={"read", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="List All Mealplan Rules", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_all_mealplan_rules(
     include_all_fields: bool = False,
     page: int = 1,
@@ -2036,7 +2183,9 @@ async def list_all_mealplan_rules(
     )
     return {"items": json_to_toon(data)}
 
-@mcp.tool(tags={"read", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Get Mealplan Rule By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_mealplan_rule_by_id(
     id: str,
     include_all_fields: bool = False,
@@ -2050,7 +2199,9 @@ async def get_mealplan_rule_by_id(
     """
     return await get_client().get_mealplan_rule_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Create Mealplan Rule", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def create_mealplan_rule(
     day: str,
     entryType: str = "dinner",
@@ -2072,7 +2223,9 @@ async def create_mealplan_rule(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Update Mealplan Rule", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_mealplan_rule(
     id: str,
     day: str = None,
@@ -2098,7 +2251,9 @@ async def update_mealplan_rule(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Mealplan Rule By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def delete_mealplan_rule_by_id(
     id: str,
     ctx: Context = None
@@ -2115,7 +2270,9 @@ async def delete_mealplan_rule_by_id(
 # Shopping Lists
 # =============================================================================
 
-@mcp.tool(tags={"read", "basic", "mealie"})
+@mcp.tool(
+    tags={"basic", "mealie"}, annotations=ToolAnnotations(title="List All Shopping Lists", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_all_shopping_lists(
     include_all_fields: bool = False,
     page: int = 1,
@@ -2135,7 +2292,9 @@ async def list_all_shopping_lists(
     )
     return {"items": json_to_toon(data)}
 
-@mcp.tool(tags={"read", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Shopping List By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_shopping_list_by_id(
     id: str,
     include_all_fields: bool = False,
@@ -2149,7 +2308,9 @@ async def get_shopping_list_by_id(
     """
     return await get_client().get_shopping_list_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Create Shopping List", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def create_shopping_list(
     name: str,
     ctx: Context = None
@@ -2165,7 +2326,9 @@ async def create_shopping_list(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Update Shopping List", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_shopping_list(
     id: str,
     name: str = None,
@@ -2183,7 +2346,9 @@ async def update_shopping_list(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Shopping List By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def delete_shopping_list_by_id(
     id: str,
     ctx: Context = None
@@ -2196,7 +2361,9 @@ async def delete_shopping_list_by_id(
     await get_client().delete_shopping_list_by_id(id, get_user_token())
     return {"success": True, "message": "Shopping list deleted successfully"}
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Update Shopping List Label Settings", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_shopping_list_label_settings(
     id: str,
     labelId: str,
@@ -2220,7 +2387,9 @@ async def update_shopping_list_label_settings(
     )
     return await get_client().update_shopping_list_label_settings(id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Add Recipe To Shopping List", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def add_recipe_to_shopping_list(
     id: str,
     recipeId: str,
@@ -2234,7 +2403,9 @@ async def add_recipe_to_shopping_list(
     """
     return await get_client().add_recipe_to_shopping_list(id, recipeId, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Remove Recipe From Shopping List", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def remove_recipe_from_shopping_list(
     id: str,
     recipeId: str,
@@ -2252,7 +2423,9 @@ async def remove_recipe_from_shopping_list(
 # Shopping Items
 # =============================================================================
 
-@mcp.tool(tags={"read", "basic", "mealie"})
+@mcp.tool(
+    tags={"basic", "mealie"}, annotations=ToolAnnotations(title="List All Shopping Items", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_all_shopping_items(
     include_all_fields: bool = False,
     page: int = 1,
@@ -2272,7 +2445,9 @@ async def list_all_shopping_items(
     )
     return {"items": json_to_toon(data)}
 
-@mcp.tool(tags={"read", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Shopping Item By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_shopping_item_by_id(
     id: str,
     include_all_fields: bool = False,
@@ -2286,7 +2461,9 @@ async def get_shopping_item_by_id(
     """
     return await get_client().get_shopping_item_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Create Shopping Item", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def create_shopping_item(
     shoppingListId: str,
     quantity: float = 0,
@@ -2323,7 +2500,9 @@ async def create_shopping_item(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Update Shopping Item", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_shopping_item(
     id: str,
     shoppingListId: str = "",
@@ -2363,7 +2542,9 @@ async def update_shopping_item(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Shopping Item By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def delete_shopping_item_by_id(
     id: str,
     ctx: Context = None
@@ -2376,7 +2557,9 @@ async def delete_shopping_item_by_id(
     await get_client().delete_shopping_item_by_id(id, get_user_token())
     return {"success": True, "message": "Shopping item deleted successfully"}
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Bulk Create Shopping Items", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def bulk_create_shopping_items(
     items: list[BulkCreateShoppingItem],
     ctx: Context = None
@@ -2390,7 +2573,9 @@ async def bulk_create_shopping_items(
         normalized.append(entry)
     return await get_client().bulk_create_shopping_items(normalized, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Bulk Update Shopping Items", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def bulk_update_shopping_items(
     items: list[BulkUpdateShoppingItem],
     ctx: Context = None
@@ -2403,7 +2588,9 @@ async def bulk_update_shopping_items(
     normalized = [item.model_dump(exclude_unset=True, exclude_none=True) for item in items]
     return await get_client().bulk_update_shopping_items(normalized, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Bulk Delete Shopping Items", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def bulk_delete_shopping_items(
     ids: list[str],
     ctx: Context = None
@@ -2419,7 +2606,9 @@ async def bulk_delete_shopping_items(
 # Labels
 # =============================================================================
 
-@mcp.tool(tags={"read", "basic", "mealie"})
+@mcp.tool(
+    tags={"basic", "mealie"}, annotations=ToolAnnotations(title="List All Labels", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_all_labels(
     include_all_fields: bool = False,
     page: int = 1,
@@ -2439,7 +2628,9 @@ async def list_all_labels(
     )
     return {"items": json_to_toon(data)}
 
-@mcp.tool(tags={"read", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Label By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_label_by_id(
     id: str,
     include_all_fields: bool = False,
@@ -2453,7 +2644,9 @@ async def get_label_by_id(
     """
     return await get_client().get_label_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Create Label", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def create_label(
     name: str,
     color: str = "",
@@ -2471,7 +2664,9 @@ async def create_label(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Update Label", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_label(
     id: str,
     name: str = None,
@@ -2491,7 +2686,9 @@ async def update_label(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Label By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def delete_label_by_id(
     id: str,
     ctx: Context = None
@@ -2508,7 +2705,9 @@ async def delete_label_by_id(
 # Recipe Timeline Events
 # =============================================================================
 
-@mcp.tool(tags={"read", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="List All Timeline Events", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_all_timeline_events(
     include_all_fields: bool = False,
     page: int = 1,
@@ -2528,7 +2727,9 @@ async def list_all_timeline_events(
     )
     return {"items": json_to_toon(data)}
 
-@mcp.tool(tags={"read", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Timeline Event By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_timeline_event_by_id(
     id: str,
     include_all_fields: bool = False,
@@ -2542,7 +2743,9 @@ async def get_timeline_event_by_id(
     """
     return await get_client().get_timeline_event_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Create Timeline Event", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def create_timeline_event(
     recipeId: str,
     eventType: str,
@@ -2563,7 +2766,9 @@ async def create_timeline_event(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Update Timeline Event", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_timeline_event(
     id: str,
     eventType: str = None,
@@ -2585,7 +2790,9 @@ async def update_timeline_event(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Timeline Event By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def delete_timeline_event_by_id(
     id: str,
     ctx: Context = None
@@ -2602,7 +2809,9 @@ async def delete_timeline_event_by_id(
 # Shared Recipes
 # =============================================================================
 
-@mcp.tool(tags={"read", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="List All Shared Recipes", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_all_shared_recipes(
     include_all_fields: bool = False,
     recipeId: str = "",
@@ -2620,7 +2829,9 @@ async def list_all_shared_recipes(
     )
     return {"items": json_to_toon(data)}
 
-@mcp.tool(tags={"read", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Get Shared Recipe By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_shared_recipe_by_id(
     id: str,
     include_all_fields: bool = False,
@@ -2634,7 +2845,9 @@ async def get_shared_recipe_by_id(
     """
     return await get_client().get_shared_recipe_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Create Shared Recipe", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def create_shared_recipe(
     recipeId: str,
     ctx: Context = None
@@ -2650,7 +2863,9 @@ async def create_shared_recipe(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Shared Recipe By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def delete_shared_recipe_by_id(
     id: str,
     ctx: Context = None
@@ -2667,7 +2882,9 @@ async def delete_shared_recipe_by_id(
 # Recipe Actions
 # =============================================================================
 
-@mcp.tool(tags={"read", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="List All Recipe Actions", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_all_recipe_actions(
     include_all_fields: bool = False,
     page: int = 1,
@@ -2687,7 +2904,9 @@ async def list_all_recipe_actions(
     )
     return {"items": json_to_toon(data)}
 
-@mcp.tool(tags={"read", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Get Recipe Action By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_recipe_action_by_id(
     id: str,
     include_all_fields: bool = False,
@@ -2701,7 +2920,9 @@ async def get_recipe_action_by_id(
     """
     return await get_client().get_recipe_action_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Create Recipe Action", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def create_recipe_action(
     name: str,
     recipeActionType: str,
@@ -2725,7 +2946,9 @@ async def create_recipe_action(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Update Recipe Action", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_recipe_action(
     id: str,
     name: str = None,
@@ -2750,7 +2973,9 @@ async def update_recipe_action(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Recipe Action By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def delete_recipe_action_by_id(
     id: str,
     ctx: Context = None
@@ -2763,7 +2988,9 @@ async def delete_recipe_action_by_id(
     await get_client().delete_recipe_action_by_id(id, get_user_token())
     return {"success": True, "message": "Recipe action deleted successfully"}
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Trigger Recipe Action", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def trigger_recipe_action(
     id: str,
     recipeSlug: str,
@@ -2781,7 +3008,9 @@ async def trigger_recipe_action(
 # Event Notifications
 # =============================================================================
 
-@mcp.tool(tags={"read", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="List All Event Notifications", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_all_event_notifications(
     include_all_fields: bool = False,
     page: int = 1,
@@ -2801,7 +3030,9 @@ async def list_all_event_notifications(
     )
     return {"items": json_to_toon(data)}
 
-@mcp.tool(tags={"read", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Get Event Notification By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_event_notification_by_id(
     id: str,
     include_all_fields: bool = False,
@@ -2815,7 +3046,9 @@ async def get_event_notification_by_id(
     """
     return await get_client().get_event_notification_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Create Event Notification", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def create_event_notification(
     name: str,
     enabled: bool = True,
@@ -2833,7 +3066,9 @@ async def create_event_notification(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Update Event Notification", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_event_notification(
     id: str,
     name: str = None,
@@ -2853,7 +3088,9 @@ async def update_event_notification(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Delete Event Notification By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def delete_event_notification_by_id(
     id: str,
     ctx: Context = None
@@ -2866,7 +3103,9 @@ async def delete_event_notification_by_id(
     await get_client().delete_event_notification_by_id(id, get_user_token())
     return {"success": True, "message": "Event notification deleted successfully"}
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Test Event Notification", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True)
+)
 async def test_event_notification(
     id: str,
     ctx: Context = None
@@ -2882,7 +3121,9 @@ async def test_event_notification(
 # Webhooks
 # =============================================================================
 
-@mcp.tool(tags={"read", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="List All Webhooks", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_all_webhooks(
     include_all_fields: bool = False,
     page: int = 1,
@@ -2902,7 +3143,9 @@ async def list_all_webhooks(
     )
     return {"items": json_to_toon(data)}
 
-@mcp.tool(tags={"read", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Get Webhook By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_webhook_by_id(
     id: str,
     include_all_fields: bool = False,
@@ -2916,7 +3159,9 @@ async def get_webhook_by_id(
     """
     return await get_client().get_webhook_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Create Webhook", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def create_webhook(
     name: str,
     url: str,
@@ -2936,7 +3181,9 @@ async def create_webhook(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Update Webhook", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_webhook(
     id: str,
     name: str = None,
@@ -2958,7 +3205,9 @@ async def update_webhook(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Delete Webhook By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def delete_webhook_by_id(
     id: str,
     ctx: Context = None
@@ -2971,7 +3220,9 @@ async def delete_webhook_by_id(
     await get_client().delete_webhook_by_id(id, get_user_token())
     return {"success": True, "message": "Webhook deleted successfully"}
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Test Webhook", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True)
+)
 async def test_webhook(
     id: str,
     ctx: Context = None
@@ -2983,7 +3234,9 @@ async def test_webhook(
     """
     return await get_client().test_webhook(id, get_user_token())
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Rerun Webhooks", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True)
+)
 async def rerun_webhooks(
     ctx: Context = None
 ) -> dict[str, Any]:
@@ -2994,7 +3247,9 @@ async def rerun_webhooks(
 # Invitations
 # =============================================================================
 
-@mcp.tool(tags={"read", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="List All Invitations", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_all_invitations(
     include_all_fields: bool = False,
     ctx: Context = None
@@ -3007,7 +3262,9 @@ async def list_all_invitations(
     data = await get_client().get_all_invitations(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
     return {"invitations": data if isinstance(data, list) else []}
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Create Invitation", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def create_invitation(
     uses: int,
     groupId: str = "",
@@ -3028,7 +3285,9 @@ async def create_invitation(
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Email Invitation", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True)
+)
 async def email_invitation(
     email: str,
     token: str,
@@ -3049,7 +3308,9 @@ async def email_invitation(
 # User Self-Service
 # =============================================================================
 
-@mcp.tool(tags={"read", "basic", "mealie"})
+@mcp.tool(
+    tags={"basic", "mealie"}, annotations=ToolAnnotations(title="Get User Profile", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_user_profile(
     include_all_fields: bool = False,
     ctx: Context = None
@@ -3061,7 +3322,9 @@ async def get_user_profile(
     """
     return await get_client().get_user_profile(get_user_token(), include_all_fields=include_all_fields)
 
-@mcp.tool(tags={"read", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="List User Ratings", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_user_ratings(
     include_all_fields: bool = False,
     ctx: Context = None
@@ -3073,7 +3336,9 @@ async def list_user_ratings(
     """
     return await get_client().get_user_ratings(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
 
-@mcp.tool(tags={"read", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get User Rating For Recipe", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_user_rating_for_recipe(
     recipeId: str,
     include_all_fields: bool = False,
@@ -3086,7 +3351,9 @@ async def get_user_rating_for_recipe(
     """
     return await get_client().get_user_rating_for_recipe(recipeId, get_user_token(), include_all_fields=include_all_fields)
 
-@mcp.tool(tags={"read", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="List User Favorites", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_user_favorites(
     include_all_fields: bool = False,
     ctx: Context = None
@@ -3098,7 +3365,9 @@ async def list_user_favorites(
     """
     return await get_client().get_user_favorites(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Set Recipe Rating", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def set_recipe_rating(
     userId: str,
     slug: str,
@@ -3116,7 +3385,9 @@ async def set_recipe_rating(
     await get_client().set_recipe_rating(params.userId, params.slug, params.rating, get_user_token())
     return {"status": "rated", "slug": slug, "rating": rating}
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Add Recipe Favorite", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def add_recipe_favorite(
     userId: str,
     slug: str,
@@ -3132,7 +3403,9 @@ async def add_recipe_favorite(
     await get_client().add_recipe_favorite(params.userId, params.slug, get_user_token())
     return {"status": "favorited", "slug": slug}
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Remove Recipe Favorite", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def remove_recipe_favorite(
     userId: str,
     slug: str,
@@ -3152,7 +3425,9 @@ async def remove_recipe_favorite(
 # Group / Household Info
 # =============================================================================
 
-@mcp.tool(tags={"read", "basic", "mealie"})
+@mcp.tool(
+    tags={"basic", "mealie"}, annotations=ToolAnnotations(title="Get Group Info", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_group_info(
     include_all_fields: bool = False,
     ctx: Context = None
@@ -3164,7 +3439,9 @@ async def get_group_info(
     """
     return await get_client().get_group_info(get_user_token(), include_all_fields=include_all_fields)
 
-@mcp.tool(tags={"read", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="List Group Members", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_group_members(
     include_all_fields: bool = False,
     ctx: Context = None
@@ -3176,7 +3453,9 @@ async def list_group_members(
     """
     return await get_client().list_group_members(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
 
-@mcp.tool(tags={"read", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Group Member", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_group_member(
     usernameOrId: str,
     include_all_fields: bool = False,
@@ -3189,14 +3468,18 @@ async def get_group_member(
     """
     return await get_client().get_group_member(usernameOrId, get_user_token(), include_all_fields=include_all_fields)
 
-@mcp.tool(tags={"read", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Group Preferences", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_group_preferences(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get the current group's preferences."""
     return await get_client().get_group_preferences(get_user_token())
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Update Group Preferences", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_group_preferences(
     privateGroup: bool = False,
     ctx: Context = None
@@ -3210,14 +3493,18 @@ async def update_group_preferences(
         {"privateGroup": privateGroup}, get_user_token()
     )
 
-@mcp.tool(tags={"read", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Get Group Storage", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_group_storage(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get group storage statistics."""
     return await get_client().get_group_storage(get_user_token())
 
-@mcp.tool(tags={"read", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="List Households", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_households(
     include_all_fields: bool = False,
     ctx: Context = None
@@ -3229,7 +3516,9 @@ async def list_households(
     """
     return await get_client().list_households(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
 
-@mcp.tool(tags={"read", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Household", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_household(
     householdSlug: str,
     include_all_fields: bool = False,
@@ -3242,7 +3531,9 @@ async def get_household(
     """
     return await get_client().get_household(householdSlug, get_user_token(), include_all_fields=include_all_fields)
 
-@mcp.tool(tags={"read", "basic", "mealie"})
+@mcp.tool(
+    tags={"basic", "mealie"}, annotations=ToolAnnotations(title="Get Household Info", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_household_info(
     include_all_fields: bool = False,
     ctx: Context = None
@@ -3254,7 +3545,9 @@ async def get_household_info(
     """
     return await get_client().get_household_info(get_user_token(), include_all_fields=include_all_fields)
 
-@mcp.tool(tags={"read", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Household Recipe", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_household_recipe(
     recipeSlug: str,
     include_all_fields: bool = False,
@@ -3267,7 +3560,9 @@ async def get_household_recipe(
     """
     return await get_client().get_household_recipe(recipeSlug, get_user_token(), include_all_fields=include_all_fields)
 
-@mcp.tool(tags={"read", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="List Household Members", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_household_members(
     include_all_fields: bool = False,
     ctx: Context = None
@@ -3279,21 +3574,27 @@ async def list_household_members(
     """
     return await get_client().list_household_members(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
 
-@mcp.tool(tags={"read", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Household Preferences", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_household_preferences(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get the current household's preferences."""
     return await get_client().get_household_preferences(get_user_token())
 
-@mcp.tool(tags={"read", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Get Household Statistics", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_household_statistics(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get household statistics."""
     return await get_client().get_household_statistics(get_user_token())
 
-@mcp.tool(tags={"write", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Update Household Preferences", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_household_preferences(
     privateHousehold: bool = False,
     ctx: Context = None
@@ -3307,7 +3608,9 @@ async def update_household_preferences(
         {"privateHousehold": privateHousehold}, get_user_token()
     )
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Set Household Permissions", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def set_household_permissions(
     userId: str,
     canManage: bool = False,
@@ -3338,7 +3641,9 @@ async def set_household_permissions(
 # Admin User CRUD
 # =============================================================================
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Create User", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def create_user(
     username: str,
     fullName: str,
@@ -3376,7 +3681,9 @@ async def create_user(
     payload = params.model_dump(exclude_unset=True, exclude_none=True)
     return await get_client().admin_create_user(payload, get_user_token())
 
-@mcp.tool(tags={"read", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Get User By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_user_by_id(
     userId: str,
     ctx: Context = None
@@ -3388,7 +3695,9 @@ async def get_user_by_id(
     """
     return await get_client().admin_get_user(userId, get_user_token())
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Update User", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_user(
     userId: str,
     username: str,
@@ -3429,7 +3738,9 @@ async def update_user(
     payload["tokens"] = current.get("tokens") or []
     return await get_client().put_raw(f"/api/admin/users/{userId}", get_user_token(), json=payload)
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Delete User", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def delete_user(
     userId: str,
     ctx: Context = None
@@ -3441,7 +3752,9 @@ async def delete_user(
     """
     return await get_client().admin_delete_user(userId, get_user_token())
 
-@mcp.tool(tags={"read", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="List Users", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_users(
     page: int = 1,
     perPage: int = 50,
@@ -3459,7 +3772,9 @@ async def list_users(
 # Admin Group CRUD
 # =============================================================================
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Create Group", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def create_group(
     name: str,
     ctx: Context = None
@@ -3471,7 +3786,9 @@ async def create_group(
     """
     return await get_client().admin_create_group({"name": name}, get_user_token())
 
-@mcp.tool(tags={"read", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Get Group By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_group_by_id(
     groupId: str,
     ctx: Context = None
@@ -3483,7 +3800,9 @@ async def get_group_by_id(
     """
     return await get_client().admin_get_group(groupId, get_user_token())
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Update Group", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_group(
     groupId: str,
     name: str,
@@ -3498,7 +3817,9 @@ async def update_group(
     params = UpdateGroupParam(id=groupId, name=name)
     return await get_client().admin_update_group(groupId, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token())
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Delete Group", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def delete_group(
     groupId: str,
     ctx: Context = None
@@ -3510,7 +3831,9 @@ async def delete_group(
     """
     return await get_client().admin_delete_group(groupId, get_user_token())
 
-@mcp.tool(tags={"read", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="List Groups", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_groups(
     page: int = 1,
     perPage: int = 50,
@@ -3528,7 +3851,9 @@ async def list_groups(
 # Admin Household CRUD
 # =============================================================================
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Create Household", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def create_household(
     name: str,
     groupId: str = None,
@@ -3544,7 +3869,9 @@ async def create_household(
     payload = params.model_dump(exclude_unset=True, exclude_none=True)
     return await get_client().admin_create_household(payload, get_user_token())
 
-@mcp.tool(tags={"read", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Get Household By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_household_by_id(
     householdId: str,
     ctx: Context = None
@@ -3556,7 +3883,9 @@ async def get_household_by_id(
     """
     return await get_client().admin_get_household(householdId, get_user_token())
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Update Household", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_household(
     householdId: str,
     name: str,
@@ -3573,7 +3902,9 @@ async def update_household(
     params = UpdateHouseholdParam(id=householdId, name=name, groupId=groupId)
     return await get_client().admin_update_household(householdId, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token())
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Delete Household", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def delete_household(
     householdId: str,
     ctx: Context = None
@@ -3585,7 +3916,9 @@ async def delete_household(
     """
     return await get_client().admin_delete_household(householdId, get_user_token())
 
-@mcp.tool(tags={"read", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="List All Households", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_all_households(
     page: int = 1,
     perPage: int = 50,
@@ -3599,21 +3932,27 @@ async def list_all_households(
     """
     return await get_client().admin_list_households(page, perPage, get_user_token())
 
-@mcp.tool(tags={"read", "basic", "mealie"})
+@mcp.tool(
+    tags={"basic", "mealie"}, annotations=ToolAnnotations(title="Get App About", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_app_about(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get general application information (version, demo status, etc.)."""
     return await get_client().get_app_about(get_user_token())
 
-@mcp.tool(tags={"read", "basic", "mealie"})
+@mcp.tool(
+    tags={"basic", "mealie"}, annotations=ToolAnnotations(title="Get App Startup Info", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_app_startup_info(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get application startup information."""
     return await get_client().get_app_startup_info(get_user_token())
 
-@mcp.tool(tags={"read", "basic", "mealie"})
+@mcp.tool(
+    tags={"basic", "mealie"}, annotations=ToolAnnotations(title="Get App Theme", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_app_theme(
     ctx: Context = None
 ) -> dict[str, Any]:
@@ -3624,7 +3963,9 @@ async def get_app_theme(
 # Domain Utilities
 # =============================================================================
 
-@mcp.tool(tags={"read", "basic", "mealie"})
+@mcp.tool(
+    tags={"basic", "mealie"}, annotations=ToolAnnotations(title="Parse Ingredient", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def parse_ingredient(
     ingredient: str,
     ctx: Context = None
@@ -3636,7 +3977,9 @@ async def parse_ingredient(
     """
     return await get_client().parse_ingredient(ingredient, get_user_token())
 
-@mcp.tool(tags={"read", "primary", "mealie"})
+@mcp.tool(
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Parse Ingredients", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def parse_ingredients(
     ingredients: list[str],
     ctx: Context = None
@@ -3649,7 +3992,9 @@ async def parse_ingredients(
     data = await get_client().parse_ingredients(ingredients, get_user_token())
     return {"results": data} if isinstance(data, list) else data
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Seed Default Foods", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def seed_default_foods(
     locale: str = "en-US",
     ctx: Context = None
@@ -3661,7 +4006,9 @@ async def seed_default_foods(
     """
     return await get_client().seed_default_foods(get_user_token(), locale=locale)
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Seed Default Labels", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def seed_default_labels(
     locale: str = "en-US",
     ctx: Context = None
@@ -3673,7 +4020,9 @@ async def seed_default_labels(
     """
     return await get_client().seed_default_labels(get_user_token(), locale=locale)
 
-@mcp.tool(tags={"write", "advanced", "mealie"})
+@mcp.tool(
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Seed Default Units", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def seed_default_units(
     locale: str = "en-US",
     ctx: Context = None
@@ -3685,7 +4034,9 @@ async def seed_default_units(
     """
     return await get_client().seed_default_units(get_user_token(), locale=locale)
 
-@mcp.tool(tags={"read", "basic", "mealie"})
+@mcp.tool(
+    tags={"basic", "mealie"}, annotations=ToolAnnotations(title="Check Server Status", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def check_server_status(
     ctx: Context = None
 ) -> dict[str, Any]:
