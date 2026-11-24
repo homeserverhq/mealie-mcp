@@ -21,14 +21,9 @@ and bulk operations.
   and maximize context window efficiency.
 - **🚀 Efficient Gets** — GET responses return only commonly used fields by
   default. Full objects are available via an `include_all_fields` flag.
-- **📄 Offset Pagination** — Every paginated `list_*` tool accepts `page` and
-  `perPage` (1–200) and returns top-level `page`, `per_page`, `total`, and
-  `total_pages` alongside the `items` array.
-- **🕒 Date Rules** — Date-only fields use `YYYY-MM-DD`; recipe time fields
-  use ISO 8601 durations such as `PT45M`.
 - **🧪 Comprehensive Testing** — 241 legacy smoke tests plus a 782-check
   semantic audit with full 175-tool coverage.
-- 🏷️ Tool Annotations — All tools expose standard MCP ToolAnnotations hints (readOnlyHint, destructiveHint, idempotentHint, openWorldHint). The tags field carries grouping metadata (basic/primary/advanced + mealie).
+- **🏷️ Tool Annotations** — All tools expose standard MCP ToolAnnotations hints (readOnlyHint, destructiveHint, idempotentHint, openWorldHint). The tags field carries grouping metadata (basic/primary/advanced + mealie).
 
 ## 🔧 Environment Variables
 
@@ -72,96 +67,15 @@ The MCP server serves at `http://mealie-mcp:80/mcp` (Streamable HTTP).
 
 ## ⚠️ Important Notes
 
-- **🌍 Recipe visibility** — New recipes are public by default. The only way to
-  create a private recipe is to pass `settings.public=false` explicitly.
-  Public/private controls logged-out access; logged-in members of the same
-  group can still see the recipe. Recipes are owned by the API token that
-  created them, so the UI's **My Recipes** filter is per-user.
 - **📋 `include_all_fields`** — Single-record `get_*` tools always honor this
   flag. Aggregate `list_*` tools honor it only when `ALLOW_ALL_AGGREGATE=true`;
   otherwise they intentionally ignore it to keep a list response bounded.
   The list-tool schemas state this explicitly.
 - **🔒 `ALLOW_ALL_AGGREGATE`** — A deliberate context-size gate, not a bug.
   Set it to `true` only when a deployment wants full aggregate payloads.
-- **📄 Pagination** — Paginated list tools reject `page < 1` and
-  `perPage` outside `1–200`. Mealie's backend treats `perPage=-1` as
-  "return everything", so the server bounds it before the call.
-- **🕒 Dates** — Mealplan `date`, `startDate`, and `endDate` accept only
-  `YYYY-MM-DD` (for example `2026-06-22`). Datetimes, epoch values, and
-  invalid calendar dates are rejected. Recipe time fields are ISO 8601
-  durations such as `PT45M`.
-- **✍️ Updates** — Update tools reject an empty change set instead of
-  silently re-saving or no-oping.
-- **🚫 Empty bulk calls** — Bulk update/delete reject an empty input list
-  before the backend call.
-- **🧬 Nested Payload Safety** — Nested recipe objects (`settings`, `notes`,
-  `nutrition`) are serialized explicitly, and failed recipe creates clean up
-  their own partial record instead of leaving duplicates.
-- **🌍 Public by Default** — `create_recipe` defaults to `settings.public=true`.
-  Set `settings.public=false` explicitly to make a recipe private. Existing
-  categories/tags/tools are reused by slug or name instead of duplicated.
 - **⚡ TOON Compression** — Bulk list responses are compressed using TOON.
   Every paginated list returns a standard `items` array plus pagination
   metadata.
-- **📝 Required Fields & Defaults** — Each `create_*` tool requires specific
-  key fields (e.g. `name` for resources). All other fields default to
-  empty strings or reasonable values. The owner/user assignment field is
-  automatically set to the authenticated user for most resources.
-
-## 🧪 Semantic Audit
-
-The audit suite lives in `src/audit/` and is independent of the server code.
-It speaks JSON-RPC/SSE to a running server and covers every tool in
-`tools/list`.
-
-```bash
-# Run inside the server container
-export API_KEY="<mealie-api-key>"
-python -m src.audit.selftest
-python -m src.audit.runner --l0 --quiet      # schema-only; no API key needed
-python -m src.audit.runner --all --quiet
-```
-
-Useful options:
-
-```bash
-python -m src.audit.runner --list-domains
-python -m src.audit.runner --domain recipes,pagination
-python -m src.audit.runner --all --report docs/tool-audit.md \
-    --json docs/tool-audit.json
-```
-
-`--all` enforces coverage: every live tool must be declared and called, every
-nested object parameter must be exercised at least once, and the residue scan
-must find zero `MCPAudit-<run>` fixtures. The audit creates a
-disposable group, household, and user to verify tenant isolation and
-group-scoped mutations, then deletes the tenant.
-
-See `docs/tool-audit.md`, `docs/tool-audit.json`, and
-`docs/audit-notes.md` for the latest run and known limitations.
-
-### Known backend limitations
-
-- **External scraping** — `create_recipe_from_url`, `create_recipe_from_url_bulk`,
-  `test_scrape_url`, and `scrape_recipe_image_url` depend on a public recipe
-  site or image host. The audit records explicit capability skips rather than
-  exercising the public internet.
-- **Event notifications** — `test_event_notification` delivers through Apprise
-  to an external service and is skipped.
-- **Invitations** — Mealie exposes no delete endpoint for invitations, so the
-  audit lists them but does not create one; `email_invitation` needs SMTP and
-  is skipped.
-- **Seeds** — `seed_default_*` writes shared group data. The audit runs them
-  only inside its disposable tenant, where group deletion removes the data.
-- **Deleted labels** — Mealie returns HTTP 500 for a missing label instead of
-  404; the audit accepts any error and verifies the label is absent from the
-  list.
-- **Recipe slugs** — Renaming a recipe makes Mealie regenerate its slug. The
-  update response carries the new slug; callers should use it for subsequent
-  reads.
-- **Favorites and ratings** — Mealie returns rating records (`recipeId`,
-  `rating`, `isFavorite`) from the favorites and ratings endpoints; recipe
-  names are resolved by the caller.
 
 ## 🛠️ API Tool Mapping
 
