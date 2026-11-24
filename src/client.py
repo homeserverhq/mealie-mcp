@@ -7,18 +7,78 @@ from urllib.parse import urlparse
 import httpx
 
 
+DATETIME_FIELDS = {"expiresAt", "timestamp", "scheduledTime", "lastMade"}
+
+
 def _normalize_datetime(value: str) -> str:
-    normalized = value.replace("Z", "+00:00")
-    if re.match(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?[+-]\d{2}:\d{2}$', normalized):
-        parsed = dt.datetime.fromisoformat(normalized)
-        parsed = parsed.astimezone(dt.timezone.utc)
-        return parsed.strftime('%Y-%m-%d %H:%M:%S')
-    return value
+    """Normalize an offset-aware ISO 8601 datetime to UTC (``...Z``).
+
+    Date-only values, naive datetimes, and epoch numbers are rejected when a
+    datetime is expected. Mealie date-only fields are validated separately by
+    ``_normalize_date``.
+    """
+    if not isinstance(value, str):
+        raise ValueError(
+            f"Invalid datetime: {value!r}. ISO 8601 format (2026-06-22T15:00:00-04:00)."
+        )
+    text = value.strip()
+    try:
+        parsed = dt.datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError(
+            f"Invalid datetime: {value}. ISO 8601 format (2026-06-22T15:00:00-04:00)."
+        ) from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError(
+            f"Invalid datetime: {value}. Timezone offset is required. "
+            "ISO 8601 format (2026-06-22T15:00:00-04:00)."
+        )
+    return parsed.astimezone(dt.timezone.utc).isoformat(
+        timespec="milliseconds"
+    ).replace("+00:00", "Z")
+
+
+def _normalize_date(value: str) -> str:
+    """Validate a date-only value (``YYYY-MM-DD``)."""
+    if not isinstance(value, str):
+        raise ValueError(
+            f"Invalid date: {value!r}. ISO 8601 date format (2026-06-22)."
+        )
+    text = value.strip()
+    try:
+        parsed = dt.date.fromisoformat(text)
+    except ValueError as exc:
+        raise ValueError(
+            f"Invalid date: {value}. ISO 8601 date format (2026-06-22)."
+        ) from exc
+    return parsed.isoformat()
 
 
 def _normalize_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    return {k: _normalize_datetime(v) if isinstance(v, str) else v
-            for k, v in payload.items()}
+    result = {}
+    for key, value in payload.items():
+        if key in DATETIME_FIELDS and isinstance(value, str) and value.strip():
+            result[key] = _normalize_datetime(value)
+        elif isinstance(value, str) and "T" in value and re.match(
+            r'^\d{4}-\d{2}-\d{2}T', value
+        ):
+            result[key] = _normalize_datetime(value)
+        else:
+            result[key] = value
+    return result
+
+SENSITIVE_USER_FIELDS = {"tokens", "cacheKey"}
+
+
+def _strip_sensitive_user(data: Any) -> Any:
+    if isinstance(data, dict):
+        result = {k: v for k, v in data.items() if k not in SENSITIVE_USER_FIELDS}
+        if isinstance(result.get("items"), list):
+            result["items"] = [_strip_sensitive_user(item) for item in result["items"]]
+        return result
+    if isinstance(data, list):
+        return [_strip_sensitive_user(item) for item in data]
+    return data
 
 
 COMMON_FIELDS: dict[str, set[str]] = {
@@ -41,12 +101,13 @@ COMMON_FIELDS: dict[str, set[str]] = {
     "event_notification": {"id", "name", "enabled"},
     "webhook": {"id", "name", "url", "enabled", "scheduledTime"},
     "invitation": {"id", "uses", "createdAt", "groupId", "householdId"},
-    "user": {"id", "username", "email", "fullName", "admin", "cacheKey"},
+    "user": {"id", "username", "email", "fullName", "admin"},
     "group": {"id", "name", "slug", "categories", "preferences"},
-    "household": {"id", "name", "slug"},
+    "household": {"id", "name", "slug", "groupId"},
     "member": {"id", "username", "userId", "email"},
-    "rating": {"id", "recipeId", "userId", "rating", "recipeSlug"},
+    "rating": {"id", "recipeId", "userId", "rating", "recipeSlug", "isFavorite"},
     "export": {"id", "filename", "type", "timestamp"},
+    "household_recipe": {"recipeId", "lastMade"},
 }
 
 
@@ -79,6 +140,26 @@ class MealieClient:
             )
         self.public_url = os.getenv("MEALIE_PUBLIC_URL", "").rstrip("/") or self.base_url
         self.public_hostname = urlparse(self.public_url).netloc or urlparse(self.public_url).hostname or self.public_url
+        self._group_slug_cache: dict[str, str] = {}
+        self.configured_group_slug = os.getenv("MEALIE_GROUP_SLUG", "").strip()
+
+    async def current_group_slug(self, api_key: Optional[str] = None) -> str:
+        """Return the caller's group slug for public recipe URLs."""
+        if self.configured_group_slug:
+            return self.configured_group_slug
+        key = api_key or ""
+        if key in self._group_slug_cache:
+            return self._group_slug_cache[key]
+        slug = ""
+        try:
+            profile = await self.get("/api/users/self", api_key)
+            if isinstance(profile, dict):
+                slug = str(profile.get("groupSlug") or "")
+        except Exception:
+            slug = ""
+        slug = slug or "home"
+        self._group_slug_cache[key] = slug
+        return slug
 
     def _get_headers(self, api_key: Optional[str] = None) -> dict[str, str]:
         headers = {"Content-Type": "application/json"}
@@ -115,7 +196,11 @@ class MealieClient:
         headers = self._get_headers(api_key)
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.request(method, url, headers=headers, **kwargs)
-            response.raise_for_status()
+            if response.status_code >= 400:
+                raise RuntimeError(
+                    f"HTTP {response.status_code} for {method} {path}: "
+                    f"{response.text[:500]}"
+                )
             if response.status_code == 204:
                 return {}
             if response.headers.get("content-type", "").startswith("application/json"):
@@ -263,7 +348,32 @@ class MealieClient:
         return await self.post("/api/recipes/bulk-actions/settings", api_key, json={"recipes": recipes_slugs, "settings": settings})
 
     async def bulk_delete_recipes(self, recipes: list[str], api_key: Optional[str] = None) -> Any:
-        return await self.post("/api/recipes/bulk-actions/delete", api_key, json={"recipes": recipes})
+        unique = list(dict.fromkeys(
+            str(item).strip() for item in recipes if str(item).strip()
+        ))
+        if not unique:
+            raise ValueError("recipes must contain at least one slug")
+        existing: list[str] = []
+        missing: list[str] = []
+        for slug in unique:
+            try:
+                await self.get(f"/api/recipes/{slug}", api_key)
+            except RuntimeError as exc:
+                if "HTTP 404" in str(exc) or "HTTP 400" in str(exc):
+                    missing.append(slug)
+                    continue
+                raise
+            existing.append(slug)
+        if existing:
+            await self.post("/api/recipes/bulk-actions/delete", api_key,
+                            json={"recipes": existing})
+        return {
+            "status": "deleted",
+            "requested": len(unique),
+            "count": len(existing),
+            "recipes": existing,
+            "missing": missing,
+        }
 
     async def list_exports(self, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         data = await self.get("/api/recipes/bulk-actions/export", api_key)
@@ -453,7 +563,7 @@ class MealieClient:
         return await self.delete(f"/api/foods/{food_id}", api_key)
 
     async def merge_foods(self, food_to_keep: str, food_to_merge: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
-        data = await self.put("/api/foods/merge", api_key, json={"fromFood": food_to_keep, "toFood": food_to_merge})
+        data = await self.put("/api/foods/merge", api_key, json={"fromFood": food_to_merge, "toFood": food_to_keep})
         if not include_all_fields and isinstance(data, dict):
             data = _filter_fields(data, COMMON_FIELDS["food"])
         return data
@@ -501,7 +611,7 @@ class MealieClient:
         return await self.delete(f"/api/units/{unit_id}", api_key)
 
     async def merge_units(self, unit_to_keep: str, unit_to_merge: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
-        data = await self.put("/api/units/merge", api_key, json={"fromUnit": unit_to_keep, "toUnit": unit_to_merge})
+        data = await self.put("/api/units/merge", api_key, json={"fromUnit": unit_to_merge, "toUnit": unit_to_keep})
         if not include_all_fields and isinstance(data, dict):
             data = _filter_fields(data, COMMON_FIELDS["unit"])
         return data
@@ -621,9 +731,9 @@ class MealieClient:
     async def get_all_mealplans(self, api_key: Optional[str] = None, page: int = 1, perPage: int = 50, start_date: str = "", end_date: str = "", include_all_fields: bool = False) -> Any:
         params: dict[str, Any] = {"page": page, "perPage": perPage}
         if start_date:
-            params["startDate"] = start_date
+            params["start_date"] = start_date
         if end_date:
-            params["endDate"] = end_date
+            params["end_date"] = end_date
         data = await self.get("/api/households/mealplans", api_key, params=params)
         if not include_all_fields:
             data = _filter_fields(data, COMMON_FIELDS["mealplan"])
@@ -784,9 +894,11 @@ class MealieClient:
 
     async def create_shopping_item(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         data = await self.post("/api/households/shopping/items", api_key, json=payload)
-        if not include_all_fields and isinstance(data, dict):
-            data = _filter_fields(data, COMMON_FIELDS["shopping_item"])
-        return data
+        items = data.get("createdItems") if isinstance(data, dict) else None
+        items = items if isinstance(items, list) else []
+        if not include_all_fields:
+            items = _filter_fields(items, COMMON_FIELDS["shopping_item"])
+        return {"createdItems": items}
 
     async def update_shopping_item(self, item_id: str, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         data = await self.put(f"/api/households/shopping/items/{item_id}", api_key, json=payload)
@@ -796,14 +908,26 @@ class MealieClient:
 
     async def bulk_create_shopping_items(self, items: list[dict[str, Any]], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         data = await self.post("/api/households/shopping/items/create-bulk", api_key, json=items)
+        if isinstance(data, dict) and isinstance(data.get("createdItems"), list):
+            data = data["createdItems"]
         if not include_all_fields:
-            if isinstance(data, list):
-                data = _filter_fields(data, COMMON_FIELDS["shopping_item"])
-            elif isinstance(data, dict):
-                data = _filter_fields(data, COMMON_FIELDS["shopping_item"])
+            data = _filter_fields(data, COMMON_FIELDS["shopping_item"])
         return data
 
     async def bulk_update_shopping_items(self, items: list[dict[str, Any]], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        # Mealie requires shoppingListId on every item even for a partial
+        # update; recover it from the stored item when the caller omitted it.
+        for entry in items:
+            if entry.get("shoppingListId") or not entry.get("id"):
+                continue
+            try:
+                existing = await self.get(
+                    f"/api/households/shopping/items/{entry['id']}", api_key
+                )
+            except Exception:
+                continue
+            if isinstance(existing, dict) and existing.get("shoppingListId"):
+                entry["shoppingListId"] = existing["shoppingListId"]
         data = await self.put("/api/households/shopping/items", api_key, json=items)
         if not include_all_fields:
             if isinstance(data, list):
@@ -886,6 +1010,8 @@ class MealieClient:
 
     async def update_timeline_event(self, event_id: str, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         try:
+            if "message" in payload:
+                payload["subject"] = payload.pop("message")
             existing = await self.get(f"/api/recipes/timeline/events/{event_id}", api_key)
             if isinstance(existing, dict):
                 merged = self._strip_nested(existing)
@@ -913,7 +1039,7 @@ class MealieClient:
     async def get_all_shared_recipes(self, api_key: Optional[str] = None, recipe_id: str = "", include_all_fields: bool = False) -> Any:
         params = {}
         if recipe_id:
-            params["recipeId"] = recipe_id
+            params["recipe_id"] = recipe_id
         data = await self.get("/api/shared/recipes", api_key, params=params or None)
         if not include_all_fields:
             data = _filter_fields(data, COMMON_FIELDS["shared_recipe"])
@@ -969,6 +1095,10 @@ class MealieClient:
 
     async def update_recipe_action(self, action_id: str, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         try:
+            if "recipeActionType" in payload:
+                payload["actionType"] = payload.pop("recipeActionType")
+            if "name" in payload:
+                payload["title"] = payload.pop("name")
             existing = await self.get(f"/api/households/recipe-actions/{action_id}", api_key)
             if isinstance(existing, dict):
                 merged = self._strip_nested(existing)
@@ -1113,14 +1243,15 @@ class MealieClient:
     async def get_user_profile(self, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         data = await self.get("/api/users/self", api_key)
         if not include_all_fields:
-            data = _filter_fields(data, COMMON_FIELDS["user"])
+            data = _strip_sensitive_user(_filter_fields(data, COMMON_FIELDS["user"]))
         return data
 
     async def get_user_ratings(self, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         data = await self.get("/api/users/self/ratings", api_key)
+        items = data.get("ratings") if isinstance(data, dict) else data
         if not include_all_fields:
-            data = _filter_fields(data, COMMON_FIELDS["rating"])
-        return data
+            items = _filter_fields(items or [], COMMON_FIELDS["rating"])
+        return items
 
     async def get_user_rating_for_recipe(self, recipe_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         data = await self.get(f"/api/users/self/ratings/{recipe_id}", api_key)
@@ -1130,9 +1261,10 @@ class MealieClient:
 
     async def get_user_favorites(self, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         data = await self.get("/api/users/self/favorites", api_key)
+        items = data.get("ratings") if isinstance(data, dict) else data
         if not include_all_fields:
-            data = _filter_fields(data, COMMON_FIELDS["recipe"])
-        return data
+            items = _filter_fields(items or [], COMMON_FIELDS["rating"])
+        return items
 
     async def set_recipe_rating(self, user_id: str, slug: str, rating: int, api_key: Optional[str] = None) -> Any:
         return await self.post(f"/api/users/{user_id}/ratings/{slug}", api_key, json={"rating": rating})
@@ -1145,15 +1277,17 @@ class MealieClient:
 
     async def get_user_favorites_by_id(self, user_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         data = await self.get(f"/api/users/{user_id}/favorites", api_key)
+        items = data.get("ratings") if isinstance(data, dict) else data
         if not include_all_fields:
-            data = _filter_fields(data, COMMON_FIELDS["recipe"])
-        return data
+            items = _filter_fields(items or [], COMMON_FIELDS["rating"])
+        return items
 
     async def get_user_ratings_by_id(self, user_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         data = await self.get(f"/api/users/{user_id}/ratings", api_key)
+        items = data.get("ratings") if isinstance(data, dict) else data
         if not include_all_fields:
-            data = _filter_fields(data, COMMON_FIELDS["rating"])
-        return data
+            items = _filter_fields(items or [], COMMON_FIELDS["rating"])
+        return items
 
     # =========================================================================
     # Group / Household Info
@@ -1207,7 +1341,7 @@ class MealieClient:
     async def get_household_recipe(self, recipe_slug: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         data = await self.get(f"/api/households/self/recipes/{recipe_slug}", api_key)
         if not include_all_fields:
-            data = _filter_fields(data, COMMON_FIELDS["recipe"])
+            data = _filter_fields(data, COMMON_FIELDS["household_recipe"])
         return data
 
     async def list_household_members(self, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
@@ -1235,8 +1369,11 @@ class MealieClient:
     async def admin_create_user(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
         return await self.post("/api/admin/users", api_key, json=payload)
 
-    async def admin_get_user(self, user_id: str, api_key: Optional[str] = None) -> Any:
-        return await self.get(f"/api/admin/users/{user_id}", api_key)
+    async def admin_get_user(self, user_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get(f"/api/admin/users/{user_id}", api_key)
+        if not include_all_fields:
+            data = _strip_sensitive_user(data)
+        return data
 
     async def admin_get_user_raw(self, user_id: str, api_key: Optional[str] = None) -> Any:
         """Get full raw user data — no stripping, no URL rewriting. For passing back to PUT."""
@@ -1248,8 +1385,11 @@ class MealieClient:
     async def admin_delete_user(self, user_id: str, api_key: Optional[str] = None) -> Any:
         return await self.delete(f"/api/admin/users/{user_id}", api_key)
 
-    async def admin_list_users(self, page: int = 1, per_page: int = 50, api_key: Optional[str] = None) -> Any:
-        return await self.get("/api/admin/users", api_key, params={"page": page, "perPage": per_page})
+    async def admin_list_users(self, page: int = 1, per_page: int = 50, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/admin/users", api_key, params={"page": page, "perPage": per_page})
+        if not include_all_fields:
+            data = _strip_sensitive_user(data)
+        return data
 
     # =========================================================================
     # Admin Group CRUD
@@ -1267,8 +1407,11 @@ class MealieClient:
     async def admin_delete_group(self, group_id: str, api_key: Optional[str] = None) -> Any:
         return await self.delete(f"/api/admin/groups/{group_id}", api_key)
 
-    async def admin_list_groups(self, page: int = 1, per_page: int = 50, api_key: Optional[str] = None) -> Any:
-        return await self.get("/api/admin/groups", api_key, params={"page": page, "perPage": per_page})
+    async def admin_list_groups(self, page: int = 1, per_page: int = 50, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/admin/groups", api_key, params={"page": page, "perPage": per_page})
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["group"])
+        return data
 
     # =========================================================================
     # Admin Household CRUD
@@ -1286,8 +1429,11 @@ class MealieClient:
     async def admin_delete_household(self, household_id: str, api_key: Optional[str] = None) -> Any:
         return await self.delete(f"/api/admin/households/{household_id}", api_key)
 
-    async def admin_list_households(self, page: int = 1, per_page: int = 50, api_key: Optional[str] = None) -> Any:
-        return await self.get("/api/admin/households", api_key, params={"page": page, "perPage": per_page})
+    async def admin_list_households(self, page: int = 1, per_page: int = 50, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.get("/api/admin/households", api_key, params={"page": page, "perPage": per_page})
+        if not include_all_fields:
+            data = _filter_fields(data, COMMON_FIELDS["household"])
+        return data
 
     # =========================================================================
     # Domain Utilities

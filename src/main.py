@@ -1,6 +1,7 @@
 from __future__ import annotations
 import datetime as dt
 import os
+import re
 import sys
 import uuid
 from contextvars import ContextVar
@@ -11,7 +12,7 @@ from mcp.types import ToolAnnotations
 from pydantic import BaseModel, Field
 from toon_mcp import json_to_toon
 
-from .client import MealieClient
+from .client import MealieClient, _normalize_date
 
 _current_user_token: ContextVar[Optional[str]] = ContextVar("current_user_token", default=None)
 
@@ -441,6 +442,67 @@ class UpdateHouseholdParam(BaseModel):
     name: str = Field(description="New name for the household.")
     groupId: str = Field(description="Group UUID the household belongs to.")
 
+def _jsonable(value: Any) -> Any:
+    """Recursively convert Pydantic models and containers to JSON-safe data."""
+    if value is None:
+        return None
+    if hasattr(value, "model_dump"):
+        return value.model_dump(exclude_none=True)
+    if isinstance(value, list):
+        return [_jsonable(item) for item in value]
+    if isinstance(value, tuple):
+        return [_jsonable(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _jsonable(item) for key, item in value.items()}
+    return value
+
+
+def _validate_pagination(page: int, perPage: int) -> tuple[int, int]:
+    """Bound offset pagination before it reaches the backend.
+
+    The backend treats ``perPage=-1`` as "return everything" and ``perPage=0``
+    as an empty page, so both are rejected here.
+    """
+    if not isinstance(page, int) or page < 1:
+        raise ValueError("page must be an integer >= 1")
+    if not isinstance(perPage, int) or perPage < 1 or perPage > 200:
+        raise ValueError("perPage must be an integer between 1 and 200")
+    return page, perPage
+
+
+def _page_response(data: Any) -> dict[str, Any]:
+    """Standard offset-page envelope: items plus top-level pagination."""
+    if isinstance(data, dict) and "items" in data:
+        return {
+            "items": json_to_toon(data.get("items") or []),
+            "page": data.get("page"),
+            "per_page": data.get("per_page"),
+            "total": data.get("total"),
+            "total_pages": data.get("total_pages"),
+        }
+    return {"items": json_to_toon(data if isinstance(data, list) else [])}
+
+
+def _list_response(data: Any) -> dict[str, Any]:
+    """Standard list envelope for non-paginated collections."""
+    if isinstance(data, dict) and isinstance(data.get("items"), list):
+        data = data["items"]
+    return {"items": json_to_toon(data if isinstance(data, list) else [])}
+
+
+def _require_nonempty(values: Any, field: str) -> Any:
+    if not values:
+        raise ValueError(f"{field} must contain at least one value")
+    return values
+
+
+def _require_update_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Reject empty update payloads so an update cannot silently no-op."""
+    if not payload:
+        raise ValueError("At least one field must be provided to update.")
+    return payload
+
+
 def _normalize_enum(value: str, valid: set[str], param_name: str) -> str:
     if not value:
         return value
@@ -469,20 +531,27 @@ async def list_all_recipes(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
         search: Search query to filter recipes by name or description.
         cookbook: Filter recipes by cookbook slug.
     """
+    page, perPage = _validate_pagination(page, perPage)
     data = await get_client().get_all_recipes(
         get_user_token(),
         page=page, perPage=perPage, search=search, cookbook=cookbook,
         include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False
     )
     if isinstance(data, dict) and "items" in data:
-        public_hostname = get_client().public_hostname
-        data["items"] = [_add_recipe_urls(item, public_hostname) for item in data["items"]]
-    return {"items": json_to_toon(data)}
+        client = get_client()
+        group_slug = await client.current_group_slug(get_user_token())
+        data["items"] = [
+            _add_recipe_urls(item, client.public_hostname, group_slug)
+            for item in data["items"]
+        ]
+    return _page_response(data)
 
 @mcp.tool(
     tags={"basic", "mealie"}, annotations=ToolAnnotations(title="Get Recipe By Slug", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -499,7 +568,7 @@ async def get_recipe_by_slug(
         include_all_fields: Default False (common fields only). Set True for all fields.
     """
     result = await get_client().get_recipe_by_slug(slug, get_user_token(), include_all_fields=include_all_fields)
-    return _add_recipe_urls(result, get_client().public_hostname)
+    return _add_recipe_urls(result, get_client().public_hostname, await get_client().current_group_slug(get_user_token()))
 
 
 def _format_ingredient(i) -> dict:
@@ -522,47 +591,80 @@ async def _resolve_labels_by_slug(
     create_func,
     token: str
 ) -> list[dict]:
-    """Resolve label objects by slug. Returns list of {id, name, slug} dicts.
-    Duplicates are collapsed — same slug = same object."""
+    """Resolve label objects by slug or name, creating only when absent.
+
+    Mealie slugifies a new label from its name and ignores a supplied custom
+    slug, so a slug-only match turns an alias into a duplicate-key error. Match
+    by slug first, then by case-insensitive name, and re-fetch after a create
+    conflict before giving up.
+    """
     if not items:
         return []
 
-    # Deduplicate by slug first
+    def field(obj: Any, key: str) -> str:
+        value = obj.get(key) if isinstance(obj, dict) else getattr(obj, key, "")
+        return str(value or "")
+
     unique_items: dict[str, Any] = {}
     for item in items:
-        key = item.slug.lower()
-        if key not in unique_items:
+        key = field(item, "slug").lower() or field(item, "name").casefold()
+        if key and key not in unique_items:
             unique_items[key] = item
 
     all_items = await fetch_func(token, page=1, perPage=500)
     items_list = all_items.get("items", [])
 
-    result = []
-    for item in unique_items.values():
-        found = next((x for x in items_list if x.get("slug", "").lower() == item.slug.lower()), None)
-        if found:
-            result.append({"id": found["id"], "name": found["name"], "slug": found["slug"]})
-        else:
-            created = await create_func({"name": item.name, "slug": item.slug}, token)
-            result.append({"id": created["id"], "name": created["name"], "slug": created["slug"]})
+    def match(item: Any) -> dict | None:
+        slug = field(item, "slug").lower()
+        name = field(item, "name").casefold()
+        return (
+            next((x for x in items_list
+                  if str(x.get("slug") or "").lower() == slug), None)
+            or next((x for x in items_list
+                     if str(x.get("name") or "").casefold() == name), None)
+        )
 
+    result: list[dict] = []
+    for item in unique_items.values():
+        found = match(item)
+        if found:
+            result.append({"id": found["id"], "name": found["name"],
+                           "slug": found["slug"]})
+            continue
+        try:
+            created = await create_func(
+                {"name": field(item, "name"), "slug": field(item, "slug")}, token
+            )
+        except Exception:
+            refreshed = await fetch_func(token, page=1, perPage=500)
+            items_list = refreshed.get("items", [])
+            found = match(item)
+            if not found:
+                raise
+            result.append({"id": found["id"], "name": found["name"],
+                           "slug": found["slug"]})
+            continue
+        result.append({"id": created["id"], "name": created["name"],
+                       "slug": created["slug"]})
     return result
 
-
-def _add_recipe_urls(recipe: dict, public_hostname: str) -> dict:
-    """Add recipeUrl and recipeImgUrl to recipe response."""
+def _add_recipe_urls(recipe: dict, public_hostname: str,
+                     group_slug: str = "home") -> dict:
+    """Add absolute recipeUrl and recipeImgUrl values to a recipe response."""
     if not isinstance(recipe, dict):
         return recipe
 
     slug = recipe.get("slug", "")
     recipe_id = recipe.get("id", "")
     image = recipe.get("image", "")
+    base = public_hostname if re.match(r"^https?://", public_hostname or "") else f"https://{public_hostname}"
+    group = group_slug or "home"
 
-    recipe_url = f"{public_hostname}/g/home/r/{slug}" if slug else None
+    recipe_url = f"{base}/g/{group}/r/{slug}" if slug else None
 
     recipe_img_url = None
     if image and recipe_id:
-        recipe_img_url = f"{public_hostname}/api/media/recipes/{recipe_id}/images/original.webp?rnd=1&version={image}"
+        recipe_img_url = f"{base}/api/media/recipes/{recipe_id}/images/original.webp?rnd=1&version={image}"
 
     result = {**recipe, "recipeUrl": recipe_url}
     if recipe_img_url:
@@ -629,10 +731,10 @@ async def create_recipe(
         name: Name of the recipe.
         description: Description of the recipe.
         recipeServings: Number of servings.
-        totalTime: Total cooking time (e.g. "45 minutes", "1 hour 30 minutes").
-        prepTime: Preparation time (e.g. "15 minutes").
-        cookTime: Cooking time (e.g. "30 minutes").
-        performTime: Active/performance time (e.g. "20 minutes").
+        totalTime: ISO 8601 duration (e.g. PT45M).
+        prepTime: ISO 8601 duration (e.g. PT45M).
+        cookTime: ISO 8601 duration (e.g. PT45M).
+        performTime: ISO 8601 duration (e.g. PT45M).
         recipeYield: Yield amount text.
         recipeYieldQuantity: Yield quantity number.
         orgURL: Original URL the recipe was sourced from.
@@ -642,10 +744,18 @@ async def create_recipe(
         recipeIngredient: Ingredient strings (e.g. '1 cup flour, sifted').
         recipeInstructions: Instruction step strings (e.g. 'Preheat oven to 350F').
         nutrition: Nutrition information.
-        settings: Recipe settings.
+        settings: Recipe settings. Defaults to public. Set public=False explicitly
+            to create a private recipe.
         notes: Recipe notes.
         image: Image URL to scrape.
     """
+    # Public is the default. The caller must explicitly set public=False to
+    # create a private recipe.
+    if settings is None:
+        settings = RecipeSettingsParam(public=True)
+    elif getattr(settings, "public", None) is None:
+        settings = settings.model_copy(update={"public": True})
+
     params = CreateRecipeParam(
         name=name, description=description, recipeServings=recipeServings,
         totalTime=totalTime, prepTime=prepTime, cookTime=cookTime, performTime=performTime,
@@ -660,72 +770,85 @@ async def create_recipe(
     slug_raw = await get_client().create_recipe({"name": params.name}, get_user_token())
     slug = slug_raw if isinstance(slug_raw, str) else slug_raw.get("slug", "")
     if not slug:
-        return {"error": "Failed to create recipe"}
-
-    recipe = await get_client().get_recipe_by_slug(slug, get_user_token(), include_all_fields=True)
-    if not isinstance(recipe, dict):
-        return {"slug": slug, "status": "created"}
+        raise ValueError("Failed to create recipe")
 
     _orig_tags = params.tags
     _orig_recipeCategory = params.recipeCategory
     _orig_tools = params.tools
 
-    recipe.update({
-        "description": params.description,
-        "recipeServings": params.recipeServings,
-        "totalTime": params.totalTime,
-        "prepTime": params.prepTime,
-        "cookTime": params.cookTime,
-        "performTime": params.performTime,
-        "recipeYield": params.recipeYield,
-        "recipeYieldQuantity": params.recipeYieldQuantity,
-        "orgURL": params.orgURL,
-        "recipeCategory": [],
-        "tags": [],
-        "tools": [],
-        "nutrition": params.nutrition,
-        "settings": params.settings,
-        "notes": params.notes,
-        "image": params.image,
-    })
+    try:
+        recipe = await get_client().get_recipe_by_slug(slug, get_user_token(), include_all_fields=True)
+        if not isinstance(recipe, dict):
+            raise ValueError(f"Created recipe could not be read back: {slug}")
 
-    if params.recipeIngredient is not None:
-        recipe["recipeIngredient"] = [
-            _format_ingredient(i)
-            for i in params.recipeIngredient
-        ]
-    if params.recipeInstructions is not None:
-        recipe["recipeInstructions"] = [{"text": i} for i in params.recipeInstructions]
+        recipe.update({
+            "description": params.description,
+            "recipeServings": params.recipeServings,
+            "totalTime": params.totalTime,
+            "prepTime": params.prepTime,
+            "cookTime": params.cookTime,
+            "performTime": params.performTime,
+            "recipeYield": params.recipeYield,
+            "recipeYieldQuantity": params.recipeYieldQuantity,
+            "orgURL": params.orgURL,
+            "recipeCategory": [],
+            "tags": [],
+            "tools": [],
+            "nutrition": _jsonable(params.nutrition),
+            "settings": _jsonable(params.settings),
+            "notes": _jsonable(params.notes),
+            "image": params.image,
+        })
 
-    result = await get_client().update_recipe(
-        slug, recipe, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE
-    )
+        if params.recipeIngredient is not None:
+            recipe["recipeIngredient"] = [
+                _format_ingredient(i)
+                for i in params.recipeIngredient
+            ]
+        if params.recipeInstructions is not None:
+            recipe["recipeInstructions"] = [{"text": i} for i in params.recipeInstructions]
+
+        result = await get_client().update_recipe(
+            slug, recipe, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE
+        )
+    except Exception:
+        # The minimal POST already created a record. Never leave an orphan when
+        # the follow-up write fails.
+        try:
+            await get_client().delete_recipe_by_slug(slug, get_user_token())
+        except Exception:
+            pass
+        raise
 
     token = get_user_token()
+    _label_errors: list[str] = []
     if _orig_tags:
         try:
             resolved = await _resolve_labels_by_slug(_orig_tags, get_client().get_all_tags, get_client().create_tag, token)
             await get_client().patch_recipe(slug, {"tags": resolved}, token)
-        except Exception:
-            pass
+        except Exception as exc:
+            _label_errors.append(f"label assignment failed: {exc}")
     if _orig_recipeCategory:
         try:
             resolved = await _resolve_labels_by_slug(_orig_recipeCategory, get_client().get_all_categories, get_client().create_category, token)
             await get_client().patch_recipe(slug, {"recipeCategory": resolved}, token)
-        except Exception:
-            pass
+        except Exception as exc:
+            _label_errors.append(f"label assignment failed: {exc}")
     if _orig_tools:
         try:
             resolved = await _resolve_labels_by_slug(_orig_tools, get_client().get_all_tools, get_client().create_tool, token)
             await get_client().patch_recipe(slug, {"tools": resolved}, token)
-        except Exception:
-            pass
+        except Exception as exc:
+            _label_errors.append(f"label assignment failed: {exc}")
 
     if _orig_tags or _orig_recipeCategory or _orig_tools:
         result = await get_client().get_recipe_by_slug(slug, token, include_all_fields=ALLOW_ALL_AGGREGATE)
 
+    if _label_errors and isinstance(result, dict):
+        result["warnings"] = _label_errors
+        result["partial"] = True
     if isinstance(result, dict):
-        return _add_recipe_urls(result, get_client().public_hostname)
+        return _add_recipe_urls(result, get_client().public_hostname, await get_client().current_group_slug(get_user_token()))
     return {"slug": slug, "status": "created"}
 
 @mcp.tool(
@@ -761,10 +884,10 @@ async def update_recipe(
         name: Name of the recipe.
         description: Description of the recipe.
         recipeServings: Number of servings.
-        totalTime: Total cooking time (e.g. "45 minutes", "1 hour 30 minutes").
-        prepTime: Preparation time (e.g. "15 minutes").
-        cookTime: Cooking time (e.g. "30 minutes").
-        performTime: Active/performance time (e.g. "20 minutes").
+        totalTime: ISO 8601 duration (e.g. PT45M).
+        prepTime: ISO 8601 duration (e.g. PT45M).
+        cookTime: ISO 8601 duration (e.g. PT45M).
+        performTime: ISO 8601 duration (e.g. PT45M).
         recipeYield: Yield amount text.
         recipeYieldQuantity: Yield quantity number.
         orgURL: Original URL the recipe was sourced from.
@@ -789,9 +912,11 @@ async def update_recipe(
         notes=[n.model_dump() for n in notes] if notes else None,
         image=image
     )
+    if not any(getattr(params, field) is not None for field in params.model_fields):
+        raise ValueError("At least one field must be provided to update.")
     recipe = await get_client().get_recipe_by_slug(slug, get_user_token(), include_all_fields=True)
     if not isinstance(recipe, dict):
-        return {"slug": slug, "status": "not_found"}
+        raise ValueError(f"Recipe not found: {slug}")
 
     _update_tags = params.tags
     _update_recipeCategory = params.recipeCategory
@@ -802,7 +927,9 @@ async def update_recipe(
         "totalTime": params.totalTime, "prepTime": params.prepTime, "cookTime": params.cookTime,
         "performTime": params.performTime, "recipeYield": params.recipeYield,
         "recipeYieldQuantity": params.recipeYieldQuantity, "orgURL": params.orgURL,
-        "nutrition": params.nutrition, "settings": params.settings, "notes": params.notes,
+        "nutrition": _jsonable(params.nutrition),
+        "settings": _jsonable(params.settings),
+        "notes": _jsonable(params.notes),
         "image": params.image,
     }
     recipe.update({k: v for k, v in scalar_fields.items() if v is not None})
@@ -827,34 +954,43 @@ async def update_recipe(
     )
 
     token = get_user_token()
+    _label_errors: list[str] = []
     if _update_tags is not None:
         try:
             resolved = await _resolve_labels_by_slug(_update_tags, get_client().get_all_tags, get_client().create_tag, token)
             await get_client().patch_recipe(slug, {"tags": resolved}, token)
-        except Exception:
-            pass
+        except Exception as exc:
+            _label_errors.append(f"label assignment failed: {exc}")
     if _update_recipeCategory is not None:
         try:
             resolved = await _resolve_labels_by_slug(_update_recipeCategory, get_client().get_all_categories, get_client().create_category, token)
             await get_client().patch_recipe(slug, {"recipeCategory": resolved}, token)
-        except Exception:
-            pass
+        except Exception as exc:
+            _label_errors.append(f"label assignment failed: {exc}")
     if _update_tools is not None:
         try:
             resolved = await _resolve_labels_by_slug(_update_tools, get_client().get_all_tools, get_client().create_tool, token)
             await get_client().patch_recipe(slug, {"tools": resolved}, token)
-        except Exception:
-            pass
+        except Exception as exc:
+            _label_errors.append(f"label assignment failed: {exc}")
 
     if _update_tags is not None or _update_recipeCategory is not None or _update_tools is not None:
-        result = await get_client().get_recipe_by_slug(slug, token, include_all_fields=ALLOW_ALL_AGGREGATE)
+        try:
+            result = await get_client().get_recipe_by_slug(
+                slug, token, include_all_fields=ALLOW_ALL_AGGREGATE
+            )
+        except Exception as exc:
+            _label_errors.append(f"refresh after label assignment failed: {exc}")
 
+    if _label_errors and isinstance(result, dict):
+        result["warnings"] = _label_errors
+        result["partial"] = True
     if isinstance(result, dict):
-        return _add_recipe_urls(result, get_client().public_hostname)
+        return _add_recipe_urls(result, get_client().public_hostname, await get_client().current_group_slug(get_user_token()))
     return result
 
 @mcp.tool(
-    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Recipe By Slug", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Recipe By Slug", readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False)
 )
 async def delete_recipe_by_slug(
     slug: str,
@@ -910,6 +1046,7 @@ async def bulk_update_recipe_settings(
         recipes: List of recipe slugs.
         settings: Settings to apply to each recipe.
     """
+    _require_nonempty(recipes, "recipes")
     if not recipes or not settings:
         return {"status": "error", "message": "recipes and settings are required"}
 
@@ -930,8 +1067,10 @@ async def list_recipe_suggestions(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
     """
-    return await get_client().get_recipe_suggestions(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
+    return _list_response(await get_client().get_recipe_suggestions(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False))
 
 @mcp.tool(
     tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Create Recipe From Url", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=True)
@@ -970,6 +1109,7 @@ async def create_recipe_from_url_bulk(
     Args:
         urls: List of recipe URLs to scrape.
     """
+    _require_nonempty(urls, "urls")
     return await get_client().create_recipe_from_url_bulk(urls, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 @mcp.tool(
@@ -1021,7 +1161,7 @@ async def scrape_recipe_image_url(
     return await get_client().scrape_recipe_image_url(slug, url, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 @mcp.tool(
-    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Delete Recipe Image", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Delete Recipe Image", readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False)
 )
 async def delete_recipe_image(
     slug: str,
@@ -1072,6 +1212,7 @@ async def bulk_tag_recipes(
         recipes: List of recipe slugs to tag.
         tags: Tags to assign to recipes.
     """
+    _require_nonempty(recipes, "recipes")
     if not recipes or not tags:
         return {"status": "error", "message": "recipes and tags are required"}
 
@@ -1092,6 +1233,7 @@ async def bulk_categorize_recipes(
         recipes: List of recipe slugs to categorize.
         categories: Categories to assign to recipes.
     """
+    _require_nonempty(recipes, "recipes")
     if not recipes or not categories:
         return {"status": "error", "message": "recipes and categories are required"}
 
@@ -1110,8 +1252,8 @@ async def bulk_delete_recipes(
     Args:
         recipes: List of recipe slugs to delete.
     """
-    await get_client().bulk_delete_recipes(recipes, get_user_token())
-    return {"status": "deleted", "count": len(recipes)}
+    _require_nonempty(recipes, "recipes")
+    return await get_client().bulk_delete_recipes(recipes, get_user_token())
 
 @mcp.tool(
     tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="List Exports", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -1124,9 +1266,11 @@ async def list_exports(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
     """
     data = await get_client().list_exports(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
-    return {"exports": data if isinstance(data, list) else []}
+    return _list_response(data)
 
 @mcp.tool(
     tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Purge Exports", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
@@ -1154,14 +1298,17 @@ async def list_all_categories(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
+    page, perPage = _validate_pagination(page, perPage)
     data = await get_client().get_all_categories(
         get_user_token(), page=page, perPage=perPage,
         include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
-    return {"items": json_to_toon(data)}
+    return _page_response(data)
 
 @mcp.tool(
     tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Category By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -1206,9 +1353,11 @@ async def list_empty_categories(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
     """
     data = await get_client().get_empty_categories(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
-    return {"items": json_to_toon(data)}
+    return _page_response(data)
 
 @mcp.tool(
     tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Create Category", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
@@ -1244,12 +1393,12 @@ async def update_category(
     """
     params = UpdateCategoryParam(name=name)
     return await get_client().update_category(
-        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        id, _require_update_payload(_require_update_payload(params.model_dump(exclude_unset=True, exclude_none=True))), get_user_token(),
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool(
-    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Category By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Category By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False)
 )
 async def delete_category_by_id(
     id: str,
@@ -1280,14 +1429,17 @@ async def list_all_tags(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
+    page, perPage = _validate_pagination(page, perPage)
     data = await get_client().get_all_tags(
         get_user_token(), page=page, perPage=perPage,
         include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
-    return {"items": json_to_toon(data)}
+    return _page_response(data)
 
 @mcp.tool(
     tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Tag By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -1332,9 +1484,11 @@ async def list_empty_tags(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
     """
     data = await get_client().get_empty_tags(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
-    return {"items": json_to_toon(data)}
+    return _page_response(data)
 
 @mcp.tool(
     tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Create Tag", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
@@ -1370,12 +1524,12 @@ async def update_tag(
     """
     params = UpdateTagParam(name=name)
     return await get_client().update_tag(
-        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        id, _require_update_payload(params.model_dump(exclude_unset=True, exclude_none=True)), get_user_token(),
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool(
-    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Tag By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Tag By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False)
 )
 async def delete_tag_by_id(
     id: str,
@@ -1406,14 +1560,17 @@ async def list_all_tools(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
+    page, perPage = _validate_pagination(page, perPage)
     data = await get_client().get_all_tools(
         get_user_token(), page=page, perPage=perPage,
         include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
-    return {"items": json_to_toon(data)}
+    return _page_response(data)
 
 @mcp.tool(
     tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Tool By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -1481,12 +1638,12 @@ async def update_tool(
     """
     params = UpdateToolParam(name=name)
     return await get_client().update_tool(
-        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        id, _require_update_payload(params.model_dump(exclude_unset=True, exclude_none=True)), get_user_token(),
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool(
-    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Tool By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Tool By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False)
 )
 async def delete_tool_by_id(
     id: str,
@@ -1517,14 +1674,17 @@ async def list_all_foods(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
+    page, perPage = _validate_pagination(page, perPage)
     data = await get_client().get_all_foods(
         get_user_token(), page=page, perPage=perPage,
         include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
-    return {"items": json_to_toon(data)}
+    return _page_response(data)
 
 @mcp.tool(
     tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Food By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -1592,12 +1752,12 @@ async def update_food(
         name=name, description=description, pluralName=pluralName, aliases=aliases
     )
     return await get_client().update_food(
-        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        id, _require_update_payload(_require_update_payload(params.model_dump(exclude_unset=True, exclude_none=True))), get_user_token(),
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool(
-    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Food By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Food By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False)
 )
 async def delete_food_by_id(
     id: str,
@@ -1625,6 +1785,8 @@ async def merge_foods(
         food_to_keep: ID of the food to keep.
         food_to_merge: ID of the food to merge into the kept food.
     """
+    if food_to_keep == food_to_merge:
+        raise ValueError("food_to_keep and food_to_merge must differ")
     return await get_client().merge_foods(food_to_keep, food_to_merge, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 # =============================================================================
@@ -1644,14 +1806,17 @@ async def list_all_units(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
+    page, perPage = _validate_pagination(page, perPage)
     data = await get_client().get_all_units(
         get_user_token(), page=page, perPage=perPage,
         include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
-    return {"items": json_to_toon(data)}
+    return _page_response(data)
 
 @mcp.tool(
     tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Unit By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -1739,12 +1904,12 @@ async def update_unit(
         fraction=fraction, useAbbreviation=useAbbreviation, aliases=aliases
     )
     return await get_client().update_unit(
-        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        id, _require_update_payload(params.model_dump(exclude_unset=True, exclude_none=True)), get_user_token(),
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool(
-    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Unit By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Unit By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False)
 )
 async def delete_unit_by_id(
     id: str,
@@ -1772,6 +1937,8 @@ async def merge_units(
         unit_to_keep: ID of the unit to keep.
         unit_to_merge: ID of the unit to merge into the kept unit.
     """
+    if unit_to_keep == unit_to_merge:
+        raise ValueError("unit_to_keep and unit_to_merge must differ")
     return await get_client().merge_units(unit_to_keep, unit_to_merge, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 # =============================================================================
@@ -1791,14 +1958,17 @@ async def list_all_comments(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
+    page, perPage = _validate_pagination(page, perPage)
     data = await get_client().get_all_comments(
         get_user_token(), page=page, perPage=perPage,
         include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
-    return {"items": json_to_toon(data)}
+    return _page_response(data)
 
 @mcp.tool(
     tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Comment By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -1852,12 +2022,12 @@ async def update_comment(
     """
     params = UpdateCommentParam(text=text)
     return await get_client().update_comment(
-        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        id, _require_update_payload(params.model_dump(exclude_unset=True, exclude_none=True)), get_user_token(),
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool(
-    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Comment By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Comment By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False)
 )
 async def delete_comment_by_id(
     id: str,
@@ -1888,14 +2058,17 @@ async def list_all_cookbooks(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
+    page, perPage = _validate_pagination(page, perPage)
     data = await get_client().get_all_cookbooks(
         get_user_token(), page=page, perPage=perPage,
         include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
-    return {"items": json_to_toon(data)}
+    return _page_response(data)
 
 @mcp.tool(
     tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Cookbook By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -1969,12 +2142,12 @@ async def update_cookbook(
         public=public, queryFilterString=queryFilterString
     )
     return await get_client().update_cookbook(
-        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        id, _require_update_payload(params.model_dump(exclude_unset=True, exclude_none=True)), get_user_token(),
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool(
-    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Cookbook By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Cookbook By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False)
 )
 async def delete_cookbook_by_id(
     id: str,
@@ -2000,6 +2173,7 @@ async def update_cookbooks(
     Args:
         cookbooks: Cookbooks to update.
     """
+    _require_nonempty(cookbooks, "cookbooks")
     payload = [c.model_dump(exclude_none=True) for c in cookbooks]
     return await get_client().update_cookbooks(payload, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
@@ -2022,17 +2196,24 @@ async def list_all_mealplans(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
-        startDate: Date only (YYYY-MM-DD).
-        endDate: Date only (YYYY-MM-DD).
+        startDate: ISO 8601 date format (2026-06-22).
+        endDate: ISO 8601 date format (2026-06-22).
     """
+    page, perPage = _validate_pagination(page, perPage)
+    if startDate:
+        startDate = _normalize_date(startDate)
+    if endDate:
+        endDate = _normalize_date(endDate)
     data = await get_client().get_all_mealplans(
         get_user_token(), page=page, perPage=perPage,
         start_date=startDate, end_date=endDate,
         include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
-    return {"items": json_to_toon(data)}
+    return _page_response(data)
 
 @mcp.tool(
     tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Mealplan By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -2061,9 +2242,11 @@ async def list_todays_meals(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
     """
     data = await get_client().get_todays_meals(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
-    return {"meals": data if isinstance(data, list) else []}
+    return _list_response(data)
 
 @mcp.tool(
     tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Create Mealplan", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
@@ -2079,12 +2262,13 @@ async def create_mealplan(
     """Create a new mealplan entry.
 
     Args:
-        date: Date only (YYYY-MM-DD).
+        date: ISO 8601 date format (2026-06-22).
         entryType: Type of meal (breakfast, lunch, dinner, side). Defaults to "dinner".
         title: Title of the mealplan entry.
         recipeId: ID of the associated recipe.
         text: Additional text for the entry.
     """
+    date = _normalize_date(date)
     entryType = _normalize_enum(entryType, {"breakfast", "lunch", "dinner", "side"}, "entryType")
     params = CreateMealplanParam(date=date, entryType=entryType, title=title, recipeId=recipeId or None, text=text or None)
     data = params.model_dump(exclude_unset=True, exclude_none=True)
@@ -2103,10 +2287,9 @@ async def create_random_mealplan(
     """Create a random mealplan entry using configured rules.
 
     Args:
-        date: Date only (YYYY-MM-DD). Defaults to today.
+        date: ISO 8601 date format (2026-06-22). Defaults to today.
     """
-    if not date:
-        date = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d")
+    date = _normalize_date(date) if date else dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d")
     return await get_client().create_random_mealplan({"date": date}, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 @mcp.tool(
@@ -2125,12 +2308,14 @@ async def update_mealplan(
 
     Args:
         id: The ID of the mealplan entry to update.
-        date: Date only (YYYY-MM-DD).
+        date: ISO 8601 date format (2026-06-22).
         entryType: New meal type (breakfast, lunch, dinner, side).
         title: New title.
         recipeId: New recipe ID.
         text: New additional text.
     """
+    if date is not None:
+        date = _normalize_date(date)
     if entryType is not None:
         entryType = _normalize_enum(entryType, {"breakfast", "lunch", "dinner", "side"}, "entryType")
     params = UpdateMealplanParam(
@@ -2138,12 +2323,12 @@ async def update_mealplan(
         recipeId=recipeId, text=text
     )
     return await get_client().update_mealplan(
-        str(id), params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        str(id), _require_update_payload(params.model_dump(exclude_unset=True, exclude_none=True)), get_user_token(),
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool(
-    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Mealplan By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Mealplan By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False)
 )
 async def delete_mealplan_by_id(
     id: int,
@@ -2174,14 +2359,17 @@ async def list_all_mealplan_rules(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
+    page, perPage = _validate_pagination(page, perPage)
     data = await get_client().get_all_mealplan_rules(
         get_user_token(), page=page, perPage=perPage,
         include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
-    return {"items": json_to_toon(data)}
+    return _page_response(data)
 
 @mcp.tool(
     tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Get Mealplan Rule By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -2247,12 +2435,12 @@ async def update_mealplan_rule(
         entryType = _normalize_enum(entryType, {"breakfast", "lunch", "dinner", "side"}, "entryType")
     params = UpdateMealplanRuleParam(day=day, entryType=entryType, queryFilterString=queryFilterString)
     return await get_client().update_mealplan_rule(
-        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        id, _require_update_payload(params.model_dump(exclude_unset=True, exclude_none=True)), get_user_token(),
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool(
-    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Mealplan Rule By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Mealplan Rule By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False)
 )
 async def delete_mealplan_rule_by_id(
     id: str,
@@ -2283,14 +2471,17 @@ async def list_all_shopping_lists(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
+    page, perPage = _validate_pagination(page, perPage)
     data = await get_client().get_all_shopping_lists(
         get_user_token(), page=page, perPage=perPage,
         include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
-    return {"items": json_to_toon(data)}
+    return _page_response(data)
 
 @mcp.tool(
     tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Shopping List By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -2342,12 +2533,12 @@ async def update_shopping_list(
     """
     params = UpdateShoppingListParam(name=name)
     return await get_client().update_shopping_list(
-        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        id, _require_update_payload(params.model_dump(exclude_unset=True, exclude_none=True)), get_user_token(),
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool(
-    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Shopping List By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Shopping List By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False)
 )
 async def delete_shopping_list_by_id(
     id: str,
@@ -2385,7 +2576,7 @@ async def update_shopping_list_label_settings(
     params = UpdateShoppingListLabelSettingsParam(
         id=str(uuid.uuid4()), shoppingListId=id, labelId=labelId, fontSize=fontSize, fontFamily=fontFamily
     )
-    return await get_client().update_shopping_list_label_settings(id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
+    return await get_client().update_shopping_list_label_settings(id, _require_update_payload(params.model_dump(exclude_unset=True, exclude_none=True)), get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 @mcp.tool(
     tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Add Recipe To Shopping List", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -2436,14 +2627,17 @@ async def list_all_shopping_items(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
+    page, perPage = _validate_pagination(page, perPage)
     data = await get_client().get_all_shopping_items(
         get_user_token(), page=page, perPage=perPage,
         include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
-    return {"items": json_to_toon(data)}
+    return _page_response(data)
 
 @mcp.tool(
     tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Shopping Item By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -2484,6 +2678,7 @@ async def create_shopping_item(
         note: Note describing the item.
         display: Display text for the item.
         checked: true = checked (purchased), false = unchecked. Default: false.
+        position: Display position (lower values first).
         foodId: ID of the associated food.
         labelId: ID of the associated label.
         unitId: ID of the associated unit.
@@ -2525,6 +2720,7 @@ async def update_shopping_item(
         note: New note.
         display: New display text.
         checked: true = checked, false = unchecked.
+        position: New display position.
         foodId: New food ID.
         labelId: New label ID.
         unitId: New unit ID.
@@ -2534,7 +2730,7 @@ async def update_shopping_item(
         position=position, foodId=foodId, labelId=labelId,
         unitId=unitId
     )
-    payload = params.model_dump(exclude_unset=True, exclude_none=True)
+    payload = _require_update_payload(params.model_dump(exclude_unset=True, exclude_none=True))
     if shoppingListId:
         payload["shoppingListId"] = shoppingListId
     return await get_client().update_shopping_item(
@@ -2543,7 +2739,7 @@ async def update_shopping_item(
     )
 
 @mcp.tool(
-    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Shopping Item By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Shopping Item By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False)
 )
 async def delete_shopping_item_by_id(
     id: str,
@@ -2564,14 +2760,22 @@ async def bulk_create_shopping_items(
     items: list[BulkCreateShoppingItem],
     ctx: Context = None
 ) -> dict[str, Any]:
-    """Bulk create shopping list items."""
+    """Bulk create shopping list items.
+
+    Args:
+        items: Shopping items to create.
+    """
+    _require_nonempty(items, "items")
     normalized = []
     for item in items:
         entry = item.model_dump(exclude_none=True)
         if not entry.get("note"):
             entry["note"] = entry.get("display", "")
         normalized.append(entry)
-    return await get_client().bulk_create_shopping_items(normalized, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
+    return _list_response(await get_client().bulk_create_shopping_items(
+        normalized, get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE,
+    ))
 
 @mcp.tool(
     tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Bulk Update Shopping Items", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -2585,6 +2789,7 @@ async def bulk_update_shopping_items(
     Args:
         items: Shopping items to update.
     """
+    _require_nonempty(items, "items")
     normalized = [item.model_dump(exclude_unset=True, exclude_none=True) for item in items]
     return await get_client().bulk_update_shopping_items(normalized, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
@@ -2600,6 +2805,7 @@ async def bulk_delete_shopping_items(
     Args:
         ids: List of shopping item IDs to delete.
     """
+    _require_nonempty(ids, "ids")
     return await get_client().bulk_delete_shopping_items(ids, get_user_token())
 
 # =============================================================================
@@ -2619,14 +2825,17 @@ async def list_all_labels(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
+    page, perPage = _validate_pagination(page, perPage)
     data = await get_client().get_all_labels(
         get_user_token(), page=page, perPage=perPage,
         include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
-    return {"items": json_to_toon(data)}
+    return _page_response(data)
 
 @mcp.tool(
     tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Label By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -2682,12 +2891,12 @@ async def update_label(
     """
     params = UpdateLabelParam(name=name, color=color)
     return await get_client().update_label(
-        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        id, _require_update_payload(params.model_dump(exclude_unset=True, exclude_none=True)), get_user_token(),
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool(
-    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Label By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Label By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False)
 )
 async def delete_label_by_id(
     id: str,
@@ -2718,14 +2927,17 @@ async def list_all_timeline_events(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
+    page, perPage = _validate_pagination(page, perPage)
     data = await get_client().get_all_timeline_events(
         get_user_token(), page=page, perPage=perPage,
         include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
-    return {"items": json_to_toon(data)}
+    return _page_response(data)
 
 @mcp.tool(
     tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Timeline Event By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -2786,12 +2998,12 @@ async def update_timeline_event(
         eventType = _normalize_enum(eventType, {"system", "info", "comment"}, "eventType")
     params = UpdateTimelineEventParam(eventType=eventType, message=message)
     return await get_client().update_timeline_event(
-        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        id, _require_update_payload(params.model_dump(exclude_unset=True, exclude_none=True)), get_user_token(),
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool(
-    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Timeline Event By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Timeline Event By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False)
 )
 async def delete_timeline_event_by_id(
     id: str,
@@ -2821,13 +3033,15 @@ async def list_all_shared_recipes(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
         recipeId: Filter by recipe ID.
     """
     data = await get_client().get_all_shared_recipes(
         get_user_token(), recipe_id=recipeId,
         include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
-    return {"items": json_to_toon(data)}
+    return _page_response(data)
 
 @mcp.tool(
     tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Get Shared Recipe By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -2864,7 +3078,7 @@ async def create_shared_recipe(
     )
 
 @mcp.tool(
-    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Shared Recipe By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Shared Recipe By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False)
 )
 async def delete_shared_recipe_by_id(
     id: str,
@@ -2895,14 +3109,17 @@ async def list_all_recipe_actions(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
+    page, perPage = _validate_pagination(page, perPage)
     data = await get_client().get_all_recipe_actions(
         get_user_token(), page=page, perPage=perPage,
         include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
-    return {"items": json_to_toon(data)}
+    return _page_response(data)
 
 @mcp.tool(
     tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Get Recipe Action By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -2968,13 +3185,13 @@ async def update_recipe_action(
         recipeActionType = _normalize_enum(recipeActionType, {"link", "post"}, "recipeActionType")
     params = UpdateRecipeActionParam(name=name, recipeActionType=recipeActionType, description=description)
     return await get_client().update_recipe_action(
-        id, params.model_dump(exclude_unset=True, exclude_none=True),
+        id, _require_update_payload(params.model_dump(exclude_unset=True, exclude_none=True)),
         get_user_token(),
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool(
-    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Recipe Action By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+    tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Delete Recipe Action By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False)
 )
 async def delete_recipe_action_by_id(
     id: str,
@@ -3021,14 +3238,17 @@ async def list_all_event_notifications(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
+    page, perPage = _validate_pagination(page, perPage)
     data = await get_client().get_all_event_notifications(
         get_user_token(), page=page, perPage=perPage,
         include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
-    return {"items": json_to_toon(data)}
+    return _page_response(data)
 
 @mcp.tool(
     tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Get Event Notification By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -3084,12 +3304,12 @@ async def update_event_notification(
     """
     params = UpdateEventNotificationParam(name=name, enabled=enabled)
     return await get_client().update_event_notification(
-        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        id, _require_update_payload(params.model_dump(exclude_unset=True, exclude_none=True)), get_user_token(),
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool(
-    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Delete Event Notification By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Delete Event Notification By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False)
 )
 async def delete_event_notification_by_id(
     id: str,
@@ -3134,14 +3354,17 @@ async def list_all_webhooks(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
         page: Page number for pagination. Defaults to 1.
         perPage: Number of items per page. Defaults to 50.
     """
+    page, perPage = _validate_pagination(page, perPage)
     data = await get_client().get_all_webhooks(
         get_user_token(), page=page, perPage=perPage,
         include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
-    return {"items": json_to_toon(data)}
+    return _page_response(data)
 
 @mcp.tool(
     tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Get Webhook By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -3201,12 +3424,12 @@ async def update_webhook(
     """
     params = UpdateWebhookParam(name=name, url=url, enabled=enabled)
     return await get_client().update_webhook(
-        id, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        id, _require_update_payload(params.model_dump(exclude_unset=True, exclude_none=True)), get_user_token(),
         include_all_fields=ALLOW_ALL_AGGREGATE
     )
 
 @mcp.tool(
-    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Delete Webhook By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Delete Webhook By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False)
 )
 async def delete_webhook_by_id(
     id: str,
@@ -3258,9 +3481,11 @@ async def list_all_invitations(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
     """
     data = await get_client().get_all_invitations(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
-    return {"invitations": data if isinstance(data, list) else []}
+    return _list_response(data)
 
 @mcp.tool(
     tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Create Invitation", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
@@ -3333,8 +3558,10 @@ async def list_user_ratings(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
     """
-    return await get_client().get_user_ratings(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
+    return _list_response(await get_client().get_user_ratings(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False))
 
 @mcp.tool(
     tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get User Rating For Recipe", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -3348,6 +3575,7 @@ async def get_user_rating_for_recipe(
 
     Args:
         recipeId: The ID of the recipe.
+        include_all_fields: Default False (common fields only). Set True for all fields.
     """
     return await get_client().get_user_rating_for_recipe(recipeId, get_user_token(), include_all_fields=include_all_fields)
 
@@ -3362,8 +3590,10 @@ async def list_user_favorites(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
     """
-    return await get_client().get_user_favorites(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
+    return _list_response(await get_client().get_user_favorites(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False))
 
 @mcp.tool(
     tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Set Recipe Rating", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -3450,8 +3680,10 @@ async def list_group_members(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
     """
-    return await get_client().list_group_members(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
+    return _list_response(await get_client().list_group_members(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False))
 
 @mcp.tool(
     tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Group Member", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -3465,6 +3697,7 @@ async def get_group_member(
 
     Args:
         usernameOrId: The username or ID of the member.
+        include_all_fields: Default False (common fields only). Set True for all fields.
     """
     return await get_client().get_group_member(usernameOrId, get_user_token(), include_all_fields=include_all_fields)
 
@@ -3513,8 +3746,10 @@ async def list_households(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
     """
-    return await get_client().list_households(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
+    return _list_response(await get_client().list_households(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False))
 
 @mcp.tool(
     tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Household", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -3528,6 +3763,7 @@ async def get_household(
 
     Args:
         householdSlug: The slug of the household.
+        include_all_fields: Default False (common fields only). Set True for all fields.
     """
     return await get_client().get_household(householdSlug, get_user_token(), include_all_fields=include_all_fields)
 
@@ -3557,6 +3793,7 @@ async def get_household_recipe(
 
     Args:
         recipeSlug: The slug of the recipe.
+        include_all_fields: Default False (common fields only). Set True for all fields.
     """
     return await get_client().get_household_recipe(recipeSlug, get_user_token(), include_all_fields=include_all_fields)
 
@@ -3571,8 +3808,10 @@ async def list_household_members(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
     """
-    return await get_client().list_household_members(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False)
+    return _list_response(await get_client().list_household_members(get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False))
 
 @mcp.tool(
     tags={"primary", "mealie"}, annotations=ToolAnnotations(title="Get Household Preferences", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -3633,7 +3872,7 @@ async def set_household_permissions(
         canInvite=canInvite, canOrganize=canOrganize
     )
     return await get_client().set_household_permissions(
-        params.model_dump(exclude_unset=True, exclude_none=True),
+        _require_update_payload(params.model_dump(exclude_unset=True, exclude_none=True)),
         get_user_token()
     )
 
@@ -3686,14 +3925,18 @@ async def create_user(
 )
 async def get_user_by_id(
     userId: str,
+    include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
     """Get a user by ID via the admin API.
 
     Args:
         userId: The UUID of the user to retrieve.
+        include_all_fields: Default False (common fields only). Set True for all fields.
     """
-    return await get_client().admin_get_user(userId, get_user_token())
+    return await get_client().admin_get_user(
+        userId, get_user_token(), include_all_fields=include_all_fields
+    )
 
 @mcp.tool(
     tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Update User", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -3739,7 +3982,7 @@ async def update_user(
     return await get_client().put_raw(f"/api/admin/users/{userId}", get_user_token(), json=payload)
 
 @mcp.tool(
-    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Delete User", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Delete User", readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False)
 )
 async def delete_user(
     userId: str,
@@ -3758,6 +4001,7 @@ async def delete_user(
 async def list_users(
     page: int = 1,
     perPage: int = 50,
+    include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all users via the admin API.
@@ -3765,8 +4009,12 @@ async def list_users(
     Args:
         page: Page number for pagination. Default 1.
         perPage: Number of results per page. Default 50.
+        include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
     """
-    return await get_client().admin_list_users(page, perPage, get_user_token())
+    page, perPage = _validate_pagination(page, perPage)
+    return _page_response(await get_client().admin_list_users(page, perPage, get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False))
 
 # =============================================================================
 # Admin Group CRUD
@@ -3818,7 +4066,7 @@ async def update_group(
     return await get_client().admin_update_group(groupId, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token())
 
 @mcp.tool(
-    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Delete Group", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Delete Group", readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False)
 )
 async def delete_group(
     groupId: str,
@@ -3837,6 +4085,7 @@ async def delete_group(
 async def list_groups(
     page: int = 1,
     perPage: int = 50,
+    include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all groups via the admin API.
@@ -3844,8 +4093,12 @@ async def list_groups(
     Args:
         page: Page number for pagination. Default 1.
         perPage: Number of results per page. Default 50.
+        include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
     """
-    return await get_client().admin_list_groups(page, perPage, get_user_token())
+    page, perPage = _validate_pagination(page, perPage)
+    return _page_response(await get_client().admin_list_groups(page, perPage, get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False))
 
 # =============================================================================
 # Admin Household CRUD
@@ -3903,7 +4156,7 @@ async def update_household(
     return await get_client().admin_update_household(householdId, params.model_dump(exclude_unset=True, exclude_none=True), get_user_token())
 
 @mcp.tool(
-    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Delete Household", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+    tags={"advanced", "mealie"}, annotations=ToolAnnotations(title="Delete Household", readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False)
 )
 async def delete_household(
     householdId: str,
@@ -3922,6 +4175,7 @@ async def delete_household(
 async def list_all_households(
     page: int = 1,
     perPage: int = 50,
+    include_all_fields: bool = False,
     ctx: Context = None
 ) -> dict[str, Any]:
     """List all households via the admin API.
@@ -3929,8 +4183,12 @@ async def list_all_households(
     Args:
         page: Page number for pagination. Default 1.
         perPage: Number of results per page. Default 50.
+        include_all_fields: Default False (common fields only). Set True for all fields.
+            On aggregate list calls this is honored only when ALLOW_ALL_AGGREGATE=true;
+            otherwise it is intentionally ignored to bound response size.
     """
-    return await get_client().admin_list_households(page, perPage, get_user_token())
+    page, perPage = _validate_pagination(page, perPage)
+    return _page_response(await get_client().admin_list_households(page, perPage, get_user_token(), include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False))
 
 @mcp.tool(
     tags={"basic", "mealie"}, annotations=ToolAnnotations(title="Get App About", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -4037,18 +4295,33 @@ async def seed_default_units(
 @mcp.tool(
     tags={"basic", "mealie"}, annotations=ToolAnnotations(title="Check Server Status", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
 )
-async def check_server_status(
-    ctx: Context = None
-) -> dict[str, Any]:
-    """Check connectivity to the Mealie backend."""
-    import httpx
+async def check_server_status(ctx: Context = None) -> dict[str, Any]:
+    """Check connectivity and authentication against the Mealie backend."""
+    token = get_user_token()
+    if not token:
+        return {
+            "status": "unauthenticated",
+            "error": "Missing Authorization bearer token",
+        }
     client = get_client()
     try:
-        async with httpx.AsyncClient(timeout=5.0) as http_client:
-            response = await http_client.get(f"{client.base_url}/api/app/about")
-            return {"status": "connected", "backend_response": response.status_code}
-    except Exception as e:
-        return {"status": "disconnected", "error": str(e)}
+        profile = await client.get("/api/users/self", token)
+        return {
+            "status": "connected",
+            "backend_response": 200,
+            "username": (profile or {}).get("username", ""),
+            "admin": bool((profile or {}).get("admin")),
+        }
+    except Exception as exc:
+        response = getattr(exc, "response", None)
+        code = getattr(response, "status_code", None)
+        if code in (401, 403):
+            return {
+                "status": "unauthorized",
+                "backend_response": code,
+                "error": str(exc)[:300],
+            }
+        return {"status": "disconnected", "error": str(exc)[:300]}
 
 # =============================================================================
 # Entry Point
